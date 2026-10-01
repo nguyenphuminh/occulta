@@ -1,0 +1,42 @@
+{
+  "name": "occulta",
+  "private": true,
+  "type": "module",
+  "description": "Private (zero-knowledge) two-party state channels on Arbitrum",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "circuits",
+    "apps/*",
+    "e2e"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "build:circuits": "npm run build -w @occulta/circuits",
+    "build:contracts": "node scripts/build-contracts.mjs",
+    "devnode": "node scripts/devnode.mjs",
+    "deploy:devnode": "node scripts/deploy.mjs --network devnode",
+    "lint": "eslint .",
+    "typecheck": "tsc -b tsconfig.json",
+    "test": "node scripts/test-all.mjs",
+    "test:unit": "vitest run --project framework --project desktop --project web",
+    "test:circuits": "vitest run --project circuits",
+    "test:contracts": "cargo test --manifest-path contracts/Cargo.toml",
+    "test:integration": "vitest run --project integration",
+    "test:ui": "playwright test -c e2e/playwright.config.ts",
+    "test:impact": "node scripts/test-impact.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.3",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.11.0",
+    "globals": "^17.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}
