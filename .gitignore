@@ -12,6 +12,9 @@ GEMINI.md
 .windsurfrules
 .github/copilot-instructions.md
 
+# --- design references: kept local, never committed ---
+/reference/
+
 # --- dependencies ---
 node_modules/
 
