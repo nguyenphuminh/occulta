@@ -17,7 +17,7 @@ import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.
 import { MemoryStore } from '../../packages/framework/src/modules/storage/index.ts';
 import { WalletRepository, WalletService } from '../../packages/framework/src/modules/wallet/index.ts';
 import { devChain } from '../../scripts/lib/devnode.ts';
-import { desktopRpc, freePort, runDesktop as run, startDesktop as startNode, stopDesktop as stop } from '../lib/desktop-process.ts';
+import { desktopRpc, freePort, runDesktop as run, startDesktop as startNode, stopDesktop as stop } from '../../scripts/lib/desktop-process.ts';
 import { client, dev, freshDeployment } from './chain.ts';
 import { devNetwork, newChannelNode, newUser, type ChannelNode } from './services.ts';
 

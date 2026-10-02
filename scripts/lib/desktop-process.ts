@@ -2,7 +2,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer, type AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { REPO } from '../../scripts/lib/devnode.ts';
+import { REPO } from './devnode.ts';
 
 const MAIN = join(REPO, 'apps/desktop/src/main.ts');
 

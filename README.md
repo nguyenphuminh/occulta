@@ -25,6 +25,20 @@ npm run setup               # builds the circuits and proving files, test fixtur
 npx playwright install chromium   # for the UI tests
 ```
 
+## Try it
+
+```sh
+npm run demo                 # everything on this machine: a local chain, the desktop client as relayer
+                             # and libp2p relay, and the website at http://127.0.0.1:5173
+npm run demo -- fund <address> [eth] [usdg]    # test money for a wallet on the local chain
+npm run demo -- --sepolia    # the website and a local relayer/relay on Arbitrum Sepolia
+```
+
+On the local chain, pick the network "Local dev chain" in the wallet; its relayer and relay are already
+set. On Sepolia, add the printed relayer and relay in Settings, fund your wallet with Sepolia ETH, and
+send the printed relayer account some ETH for gas. Use a second browser profile as the other side of a
+channel. Ctrl+C stops everything.
+
 ## Running it locally
 
 ```sh

@@ -19,6 +19,7 @@
     "devnode": "node scripts/devnode.ts",
     "deploy:devnode": "node scripts/deploy.ts",
     "deploy:network": "node scripts/deploy-network.ts",
+    "demo": "node scripts/demo.ts",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "node scripts/test-all.ts",

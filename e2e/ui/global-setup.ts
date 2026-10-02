@@ -13,7 +13,7 @@ import { REPO, devChain, startDevnode } from '../../scripts/lib/devnode.ts';
 import { buildContracts } from '../../scripts/lib/stylus.ts';
 import { client, dev, freshDeployment } from '../integration/chain.ts';
 import { devNetwork } from '../integration/services.ts';
-import { desktopRpc, freePort, runDesktop, startDesktop, stopDesktop } from '../lib/desktop-process.ts';
+import { desktopRpc, freePort, runDesktop, startDesktop, stopDesktop } from '../../scripts/lib/desktop-process.ts';
 
 export const UI_PORT = 5199;
 
