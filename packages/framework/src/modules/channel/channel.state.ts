@@ -157,10 +157,19 @@ export function successorProblem(prev: ChannelState, next: ChannelState, kind: '
   return null;
 }
 
+/** A proposal competing to become the next state: its nonce and its proposer's channel key. */
+export interface Rival {
+  nonce: bigint;
+  proposer: PublicKey;
+}
+
 /**
- * BRD 2.2.8 tie-breaker: when both sides propose on the same state, the proposal of the side with
- * the smaller channel public key wins.
+ * BRD 2.2.8: when both sides propose on the same state, the proposal with the higher nonce wins.
+ * A higher nonce is also what wins a dispute, so the losing proposal can never beat the agreed
+ * state, even if someone countersigns it later. Equal nonces: the smaller channel key wins.
  */
-export function winsTieBreak(mine: PublicKey, theirs: PublicKey): boolean {
-  return mine[0] !== theirs[0] ? mine[0] < theirs[0] : mine[1] < theirs[1];
+export function winsTieBreak(mine: Rival, theirs: Rival): boolean {
+  if (mine.nonce !== theirs.nonce) return mine.nonce > theirs.nonce;
+  const [a, b] = [mine.proposer, theirs.proposer];
+  return a[0] !== b[0] ? a[0] < b[0] : a[1] < b[1];
 }

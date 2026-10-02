@@ -91,11 +91,35 @@ describe('channel state rules', () => {
     expect(successorProblem(prev, { ...close, final: false }, 'close', 0)).toMatch(/final/);
   });
 
-  it('breaks ties by the smaller public key, x first then y', () => {
-    expect(winsTieBreak([1n, 9n], [2n, 0n])).toBe(true);
-    expect(winsTieBreak([2n, 0n], [1n, 9n])).toBe(false);
-    expect(winsTieBreak([3n, 1n], [3n, 2n])).toBe(true);
-    expect(winsTieBreak([3n, 2n], [3n, 1n])).toBe(false);
+  it('settles rival proposals by the higher nonce, whatever the keys', () => {
+    const small = [1n, 9n] as const;
+    const large = [2n, 0n] as const;
+    expect(winsTieBreak({ nonce: 1000n, proposer: large }, { nonce: 105n, proposer: small })).toBe(true);
+    expect(winsTieBreak({ nonce: 105n, proposer: small }, { nonce: 1000n, proposer: large })).toBe(false);
+  });
+
+  it('breaks an equal-nonce tie by the smaller public key, x first then y', () => {
+    const rival = (proposer: readonly [bigint, bigint]) => ({ nonce: 7n, proposer });
+    expect(winsTieBreak(rival([1n, 9n]), rival([2n, 0n]))).toBe(true);
+    expect(winsTieBreak(rival([2n, 0n]), rival([1n, 9n]))).toBe(false);
+    expect(winsTieBreak(rival([3n, 1n]), rival([3n, 2n]))).toBe(true);
+    expect(winsTieBreak(rival([3n, 2n]), rival([3n, 1n]))).toBe(false);
+  });
+
+  it('never lets a dropped proposal outrank the agreed one in a dispute', () => {
+    // Both sides decide the same way, and the loser's nonce is never above the winner's, so
+    // countersigning the dropped proposal later cannot beat the agreed state.
+    const pkA = channelPublicKeyOf(generateChannelKey());
+    const pkB = channelPublicKeyOf(generateChannelKey());
+    for (let i = 0; i < 500; i++) {
+      const base = 1_000n;
+      const a = { nonce: base + (i % 7 === 0 ? 5n : nonceStep()), proposer: pkA };
+      const b = { nonce: base + (i % 7 === 0 ? 5n : nonceStep()), proposer: pkB };
+      const aWins = winsTieBreak(a, b);
+      expect(winsTieBreak(b, a)).toBe(!aWins);
+      const [winner, loser] = aWins ? [a, b] : [b, a];
+      expect(loser.nonce <= winner.nonce).toBe(true);
+    }
   });
 
   it('rebuilds every signed state from the compact history and finds one by hash', () => {

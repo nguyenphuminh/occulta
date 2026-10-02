@@ -535,7 +535,10 @@ export class ChannelService {
     if (r.status === 'funding') await this.refreshLive(r);
     if (r.status !== 'live') throw new AppError(409, 'NOT_LIVE', 'The channel is not live');
     if (r.pending && r.pending.prevHash === m.prevHash) {
-      if (winsTieBreak(publicKeyOf(r, me), publicKeyOf(r, peer))) throw new AppError(409, 'CONFLICT', 'A rival proposal on the same state wins the tie-break');
+      const mine = { nonce: r.pending.state.nonce, proposer: publicKeyOf(r, me) };
+      if (winsTieBreak(mine, { nonce: m.state.nonce, proposer: publicKeyOf(r, peer) })) {
+        throw new AppError(409, 'CONFLICT', 'A rival proposal on the same state wins the tie-break');
+      }
       r.pending = null; // ours loses: countersign theirs; our payment is proposed again on top of it
     }
     const problem = successorProblem(r.latest.state, m.state, m.type, me);

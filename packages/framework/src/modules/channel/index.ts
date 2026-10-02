@@ -14,3 +14,4 @@ export {
   signedStates,
   winsTieBreak,
 } from './channel.state.ts';
+export type { Rival } from './channel.state.ts';
