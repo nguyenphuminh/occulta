@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { brotliCompressSync, constants } from 'node:zlib';
-import { BaseError, bytesToHex, concat, numberToHex, parseAbi, parseEther, type Address, type Hex, type PublicClient, type WalletClient } from 'viem';
+import { BaseError, bytesToHex, concat, keccak256, numberToHex, parseAbi, parseEther, type Address, type Hex, type PublicClient, type WalletClient } from 'viem';
 import { disputesAbi, poolAbi } from '../../packages/framework/src/modules/chain/chain.abi.ts';
 import { REPO } from './devnode.ts';
 
@@ -18,7 +18,17 @@ export const MAX_CODE_SIZE = 24 * 1024;
 
 const CONTRACTS_DIR = join(REPO, 'contracts');
 const ARB_WASM: Address = '0x0000000000000000000000000000000000000071';
-const arbWasmAbi = parseAbi(['function activateProgram(address program) payable returns (uint16 version, uint256 dataFee)']);
+const arbWasmAbi = parseAbi([
+  'function activateProgram(address program) payable returns (uint16 version, uint256 dataFee)',
+  'function codehashVersion(bytes32 codehash) view returns (uint16 version)',
+]);
+/**
+ * Public RPC nodes refuse to simulate or estimate an activation. Such an activation is sent with
+ * this gas limit (the largest program needs about 6M) and offers this much for the data fee
+ * (about 0.0001 ETH per program); ArbWasm refunds whatever exceeds the actual fee.
+ */
+const BLIND_ACTIVATION_GAS = 20_000_000n;
+const BLIND_ACTIVATION_FEE = parseEther('0.002');
 
 export interface BuiltContract {
   name: ContractName;
@@ -57,7 +67,7 @@ export function buildContracts({ e2e = false } = {}): BuiltContract[] {
 }
 
 /** EVM initcode that returns `code` as the contract's code (same prelude as cargo-stylus). */
-function deploymentData(code: Uint8Array): Hex {
+export function deploymentData(code: Uint8Array): Hex {
   const prelude: Hex = concat([
     '0x7f',
     numberToHex(code.length, { size: 32 }),
@@ -78,7 +88,13 @@ export async function deployProgram(wallet: WalletClient, client: PublicClient, 
   const receipt = await client.waitForTransactionReceipt({ hash });
   if (receipt.status !== 'success' || !receipt.contractAddress) throw new Error('Stylus deployment failed');
   const address = receipt.contractAddress;
-  let dataFee: bigint;
+  // Activation is per code hash: identical code deployed before is already active.
+  const active = await client
+    .readContract({ address: ARB_WASM, abi: arbWasmAbi, functionName: 'codehashVersion', args: [keccak256(code)] })
+    .then(() => true, () => false);
+  if (active) return address;
+  let value = BLIND_ACTIVATION_FEE;
+  let gas: bigint | undefined = BLIND_ACTIVATION_GAS;
   try {
     const { result } = await client.simulateContract({
       account,
@@ -86,15 +102,15 @@ export async function deployProgram(wallet: WalletClient, client: PublicClient, 
       abi: arbWasmAbi,
       functionName: 'activateProgram',
       args: [address],
-      value: parseEther('1'),
+      // Any value at least the data fee works; the account's balance is the most it can offer.
+      value: await client.getBalance({ address: account.address }),
     });
-    dataFee = (result[1] * 120n) / 100n;
+    value = (result[1] * 120n) / 100n;
+    gas = undefined;
   } catch (err) {
-    // Activation is per code hash: identical code deployed before is already active.
-    if (err instanceof BaseError && err.message.includes('ProgramUpToDate')) return address;
-    throw err;
+    if (!(err instanceof BaseError && err.message.includes('activations not allowed'))) throw err;
   }
-  const activation = await wallet.writeContract({ account, chain: wallet.chain, address: ARB_WASM, abi: arbWasmAbi, functionName: 'activateProgram', args: [address], value: dataFee });
+  const activation = await wallet.writeContract({ account, chain: wallet.chain, address: ARB_WASM, abi: arbWasmAbi, functionName: 'activateProgram', args: [address], value, gas });
   if ((await client.waitForTransactionReceipt({ hash: activation })).status !== 'success') throw new Error('Stylus activation failed');
   return address;
 }
@@ -122,11 +138,14 @@ export async function deployOcculta(wallet: WalletClient, client: PublicClient, 
   const pool = await deployProgram(wallet, client, built.pool);
   const disputes = await deployProgram(wallet, client, built.disputes);
   const account = wallet.account!;
-  for (const hash of [
-    await wallet.writeContract({ account, chain: wallet.chain, address: pool, abi: poolAbi, functionName: 'initialize', args: [usdg, verifier, hasher, disputes] }),
-    await wallet.writeContract({ account, chain: wallet.chain, address: disputes, abi: disputesAbi, functionName: 'initialize', args: [pool, verifier] }),
+  // One after the other: a public RPC can hand out a stale nonce for a transaction sent before the
+  // previous one is mined.
+  for (const send of [
+    () => wallet.writeContract({ account, chain: wallet.chain, address: pool, abi: poolAbi, functionName: 'initialize', args: [usdg, verifier, hasher, disputes] }),
+    () => wallet.writeContract({ account, chain: wallet.chain, address: disputes, abi: disputesAbi, functionName: 'initialize', args: [pool, verifier] }),
   ]) {
-    if ((await client.waitForTransactionReceipt({ hash })).status !== 'success') throw new Error('initialization failed: someone else may have initialized first; redeploy');
+    const receipt = await client.waitForTransactionReceipt({ hash: await send() });
+    if (receipt.status !== 'success') throw new Error('initialization failed: someone else may have initialized first; redeploy');
   }
   return { chainId: await client.getChainId(), pool, disputes, verifier, hasher, usdg, deployBlock: deployBlock.toString() };
 }

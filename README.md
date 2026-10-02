@@ -73,8 +73,19 @@ production deployment needs a multi-party phase-2 ceremony.
 
 ## Deploying to public networks
 
-The contracts are not deployed on Arbitrum One, Arbitrum Sepolia or the Robinhood chains yet; the
-built-in configurations have no `contracts` block. Deploying needs a funded deployer key on each chain:
+Arbitrum Sepolia is deployed (production build, 3–7 day dispute window), and its built-in
+configuration points at it:
+
+| Contract | Arbitrum Sepolia |
+|---|---|
+| Pool | `0x5CfB7B562baa70135590162609B480d5773aDF5a` |
+| Disputes | `0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83` |
+| Groth16 verifier | `0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770` |
+| Poseidon hasher | `0x154052BAD5D2D3c79d31FDF731E46586144646F2` |
+
+It still lists no transaction relayers or libp2p relays: until some are published, users add their
+own (e.g. a desktop client) in the website's settings. Arbitrum One and the Robinhood chains are not
+deployed yet. Deploying needs a funded deployer key on each chain:
 
 ```sh
 OCCULTA_DEPLOYER_KEY=0x… npm run deploy:network -- --network arbitrum-sepolia
