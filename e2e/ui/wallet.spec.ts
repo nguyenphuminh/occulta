@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { mnemonicToAccount, privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { PASSWORD, card, createWallet, setPassword } from './helpers.ts';
+import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, setPassword, unlock, useDevNetwork } from './helpers.ts';
 
 /** Everything this website stored in IndexedDB, as text. */
 async function storedText(page: Page): Promise<string> {
@@ -138,4 +138,53 @@ test('the export file restores the wallet in a fresh browser and records when it
   await expect(other.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
   await expect(other.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
   await fresh.close();
+});
+
+test('each account and each network keeps its own notes and channels; Settings keeps added relays and relayers', async ({ page }) => {
+  await createWallet(page);
+  await useDevNetwork(page);
+  await fundPublicly(page, '1');
+  await page.getByRole('link', { name: 'Shielded' }).click();
+  await card(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
+  await card(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+
+  // A second account of the same wallet sees none of the first account's notes.
+  await page.getByRole('button', { name: 'Add account' }).click();
+  await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
+  await page.getByLabel('Account', { exact: true }).selectOption({ index: 1 });
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
+  await page.getByLabel('Account', { exact: true }).selectOption({ index: 0 });
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+
+  // Another network neither, and Occulta tells where it is not deployed.
+  await page.getByLabel('Network', { exact: true }).selectOption('arbitrum-one');
+  await expect(page.getByText('Occulta is not deployed on Arbitrum One yet.')).toBeVisible();
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
+  await page.getByRole('link', { name: 'Channels' }).click();
+  await expect(page.getByText('Channels need a libp2p relay. Add one in Settings for this network.')).toBeVisible();
+
+  // Relayers and relays added in Settings stay, also after locking, and can be removed.
+  const relay = devNetworkInfo().libp2pRelays[0] as string;
+  await page.getByRole('link', { name: 'Settings' }).click();
+  const relayers = card(page, 'Transaction relayers on Arbitrum One');
+  const relays = card(page, 'libp2p relays on Arbitrum One');
+  await relayers.getByLabel('Add', { exact: true }).fill('https://relayer.example.com');
+  await relayers.getByRole('button', { name: 'Add' }).click();
+  await relays.getByLabel('Add', { exact: true }).fill(relay);
+  await relays.getByRole('button', { name: 'Add' }).click();
+  await expect(relays.getByText(relay)).toBeVisible();
+  await page.getByRole('button', { name: 'Lock' }).click();
+  await unlock(page);
+  await expect(relayers.getByText('https://relayer.example.com')).toBeVisible();
+  await expect(relays.getByText(relay)).toBeVisible();
+  await page.getByRole('link', { name: 'Channels' }).click();
+  await expect(card(page, 'Invite someone')).toBeVisible(); // a relay is now known on this network
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await relayers.getByRole('listitem').filter({ hasText: 'https://relayer.example.com' }).getByRole('button', { name: 'Remove' }).click();
+  await expect(relayers.getByText('https://relayer.example.com')).toHaveCount(0);
+
+  await useDevNetwork(page);
+  await page.getByRole('link', { name: 'Shielded' }).click();
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
 });

@@ -1,10 +1,10 @@
 // BRD 2.2.2–2.2.5 and 2.2.14.4 in the browser: public funds, deposit with presets, private transfer
 // with the relayer fee shown first, and withdrawal to a never-used account of the wallet.
 import { expect, test } from '@playwright/test';
-import { parseEther } from 'viem';
+import { parseAbi, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { client } from '../integration/chain.ts';
-import { card, confirmRelayed, createWallet, fundPublicly, useDevNetwork } from './helpers.ts';
+import { card, confirmRelayed, createWallet, devNetworkInfo, fundPublicly, useDevNetwork } from './helpers.ts';
 
 test('public funds, deposit, private transfer and withdrawal to a new account', async ({ browser }) => {
   const [alice, bob] = await Promise.all([browser.newContext().then((c) => c.newPage()), browser.newContext().then((c) => c.newPage())]);
@@ -62,4 +62,59 @@ test('public funds, deposit, private transfer and withdrawal to a new account', 
   await send.getByLabel('Amount (ETH)', { exact: true }).fill('0.05');
   await send.getByRole('button', { name: 'Send' }).click();
   await expect.poll(() => client.getBalance({ address: to })).toBe(parseEther('0.05'));
+});
+
+test('USDG: public balance, deposit with approval, private transfer, withdrawal to another address, clear errors', async ({ browser }) => {
+  const [alice, bob] = await Promise.all([browser.newContext().then((c) => c.newPage()), browser.newContext().then((c) => c.newPage())]);
+  for (const page of [alice, bob]) {
+    await createWallet(page);
+    await useDevNetwork(page);
+  }
+  await fundPublicly(alice, '1', '100');
+  await expect(alice.getByTestId('public-usdg')).toHaveText('100 USDG');
+
+  // Deposit: the wallet approves the pool to take the USDG, then deposits.
+  await alice.getByRole('link', { name: 'Shielded' }).click();
+  const deposit = card(alice, 'Deposit');
+  await deposit.getByLabel('Token', { exact: true }).selectOption('usdg');
+  await expect(deposit.getByRole('button', { name: '1000', exact: true })).toBeVisible(); // USDG presets
+  await deposit.getByRole('button', { name: '10', exact: true }).click();
+  await deposit.getByRole('button', { name: 'Deposit' }).click();
+  await expect(alice.getByTestId('shielded-usdg')).toHaveText('10 USDG');
+  await expect(card(alice, 'Shielded balance').getByText('1 unspent notes')).toBeVisible();
+
+  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await expect(bob.getByTestId('shielded-address')).toHaveText(/^occ/);
+  const bobShielded = (await bob.getByTestId('shielded-address').textContent()) as string;
+  const transfer = card(alice, 'Private transfer');
+  await transfer.getByLabel('To shielded address', { exact: true }).fill(bobShielded);
+  await transfer.getByLabel('Token', { exact: true }).selectOption('usdg');
+  await transfer.getByLabel('Amount (USDG)', { exact: true }).fill('2.5');
+  await transfer.getByRole('button', { name: 'Send privately' }).click();
+  await confirmRelayed(alice, 'Send privately', '0.01 USDG');
+  await expect(alice.getByTestId('shielded-usdg')).toHaveText('7.49 USDG');
+  await expect(bob.getByTestId('shielded-usdg')).toHaveText('2.5 USDG');
+
+  // More than she holds: refused with an explanation, nothing sent.
+  await transfer.getByLabel('Amount (USDG)', { exact: true }).fill('50');
+  await transfer.getByRole('button', { name: 'Send privately' }).click();
+  const dialog = alice.getByRole('dialog', { name: 'Confirm: Send privately' });
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Not enough shielded funds in this token (including the relayer fee)');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(alice.getByTestId('shielded-usdg')).toHaveText('7.49 USDG');
+
+  // Withdrawal to an address of Bob's choice.
+  const to = privateKeyToAccount(generatePrivateKey()).address;
+  const withdraw = card(bob, 'Withdraw');
+  await withdraw.getByLabel('Token', { exact: true }).selectOption('usdg');
+  await withdraw.getByRole('button', { name: '1', exact: true }).click();
+  await withdraw.getByLabel('Another address').check();
+  await withdraw.getByLabel('Recipient address', { exact: true }).fill(to);
+  await withdraw.getByRole('button', { name: 'Withdraw' }).click();
+  await confirmRelayed(bob, 'Withdraw', '0.01 USDG');
+  await expect(withdraw.getByText(`Withdrawn to ${to}.`)).toBeVisible();
+  const erc20 = parseAbi(['function balanceOf(address) view returns (uint256)']);
+  expect(await client.readContract({ address: devNetworkInfo().usdg as `0x${string}`, abi: erc20, functionName: 'balanceOf', args: [to] })).toBe(1_000_000n);
+  await expect(bob.getByTestId('shielded-usdg')).toHaveText('1.49 USDG');
 });

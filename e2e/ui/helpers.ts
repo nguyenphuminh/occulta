@@ -1,14 +1,14 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { parseEther, type Address } from 'viem';
+import { parseAbi, parseEther, parseUnits, type Address } from 'viem';
 import { devChain } from '../../scripts/lib/devnode.ts';
 import { client, dev } from '../integration/chain.ts';
 
 export const PASSWORD = 'correct horse battery';
 
 /** The dev network the website was built with (set by the global setup). */
-export function devNetworkInfo(): { id: string; name: string; usdg: string } {
-  return JSON.parse(process.env.OCCULTA_UI_NETWORK as string) as { id: string; name: string; usdg: string };
+export function devNetworkInfo(): { id: string; name: string; usdg: string; relayers: string[]; libp2pRelays: string[] } {
+  return JSON.parse(process.env.OCCULTA_UI_NETWORK as string) as { id: string; name: string; usdg: string; relayers: string[]; libp2pRelays: string[] };
 }
 
 export const card = (page: Page, title: string): Locator => page.getByRole('region', { name: title, exact: true });
@@ -44,22 +44,41 @@ export async function useDevNetwork(page: Page): Promise<void> {
 /** The dev account sends one transaction at a time, so concurrent funding never reuses a nonce. */
 let devQueue: Promise<unknown> = Promise.resolve();
 
-/** Sends test ETH to the active account's public address and returns that address. */
-export async function fundPublicly(page: Page, eth: string): Promise<Address> {
+export function devSend<T>(send: () => Promise<T>): Promise<T> {
+  const run = devQueue.then(send);
+  devQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** Sends test ETH (and optionally test USDG) to the active account's public address and returns it. */
+export async function fundPublicly(page: Page, eth: string, usdg?: string): Promise<Address> {
   await page.getByRole('link', { name: 'Public' }).click();
   const address = (await page.getByTestId('public-address').textContent()) as Address;
-  const send = devQueue.then(async () =>
+  await devSend(async () =>
     client.waitForTransactionReceipt({ hash: await dev.sendTransaction({ account: dev.account!, chain: devChain, to: address, value: parseEther(eth) }) }),
   );
-  devQueue = send.catch(() => undefined);
-  await send;
+  if (usdg) {
+    const mint = parseAbi(['function mint(address to, uint256 value)']);
+    const token = devNetworkInfo().usdg as Address;
+    await devSend(async () =>
+      client.waitForTransactionReceipt({
+        hash: await dev.writeContract({ account: dev.account!, chain: devChain, address: token, abi: mint, functionName: 'mint', args: [address, parseUnits(usdg, 6)] }),
+      }),
+    );
+  }
   return address;
 }
 
+export async function unlock(page: Page): Promise<void> {
+  await page.getByLabel('Wallet password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByRole('button', { name: 'Lock' })).toBeVisible();
+}
+
 /** Confirms a relayed action's review dialog and waits for it to finish. */
-export async function confirmRelayed(page: Page, label: string): Promise<void> {
+export async function confirmRelayed(page: Page, label: string, fee = '0.0001 ETH'): Promise<void> {
   const dialog = page.getByRole('dialog', { name: `Confirm: ${label}` });
-  await expect(dialog).toContainText('Relayer fee: 0.0001 ETH');
+  await expect(dialog).toContainText(`Relayer fee: ${fee}`);
   await dialog.getByRole('button', { name: 'Confirm' }).click();
   await expect(dialog).toBeHidden({ timeout: 120_000 });
 }
@@ -86,4 +105,22 @@ export async function profiled<T>(page: Page, run: () => Promise<T>): Promise<T>
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(file, JSON.stringify(profile));
   }
+}
+
+/** Creates an invite on the Channels page and returns its link. */
+export async function createInvite(page: Page): Promise<string> {
+  await page.getByRole('link', { name: 'Channels' }).click();
+  await card(page, 'Invite someone').getByRole('button', { name: 'Create invite' }).click();
+  const link = (await page.getByTestId('invite-link').textContent()) as string;
+  expect(link).toMatch(/\/#\/invite\/[A-Za-z0-9_-]+$/);
+  return link;
+}
+
+/** Pays in a channel and answers the wallet's confirmation dialog. */
+export async function payInChannel(page: Page, channel: Locator, amount: string, confirm: boolean, symbol = 'ETH'): Promise<void> {
+  await channel.getByLabel(`Pay (${symbol})`, { exact: true }).fill(amount);
+  await channel.getByRole('button', { name: 'Pay', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Confirm payment' });
+  await expect(dialog).toContainText(`Pay ${amount} ${symbol}`);
+  await dialog.getByRole('button', { name: confirm ? 'Confirm payment' : 'Cancel' }).click();
 }
