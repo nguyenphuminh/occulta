@@ -3,8 +3,12 @@ import { join } from 'node:path';
 import { parseAbi, parseEther, zeroAddress, type Address } from 'viem';
 import { generateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
+import { createPeerNode } from '../../packages/framework/src/libp2p.node.ts';
 import { ChainAdapter, type NetworkConfig } from '../../packages/framework/src/modules/chain/index.ts';
+import { ChannelRepository, ChannelService, type ChannelDeps } from '../../packages/framework/src/modules/channel/index.ts';
+import { DisputeService } from '../../packages/framework/src/modules/dispute/index.ts';
 import { KeyRing } from '../../packages/framework/src/modules/keys/index.ts';
+import { P2PService } from '../../packages/framework/src/modules/p2p/index.ts';
 import { PoolRepository, PoolService } from '../../packages/framework/src/modules/pool/index.ts';
 import { DirectRelayer, RelayerService } from '../../packages/framework/src/modules/relayer/index.ts';
 import { MemoryStore } from '../../packages/framework/src/modules/storage/index.ts';
@@ -63,4 +67,25 @@ export async function newRelayer(network: NetworkConfig, chain: ChainAdapter, fe
     fees: { [zeroAddress]: fees.eth, [network.usdg]: fees.usdg },
   });
   return { user, service, port: new DirectRelayer(service) };
+}
+
+export interface ChannelNode {
+  p2p: P2PService;
+  channels: ChannelService;
+  disputes: DisputeService;
+}
+
+/** A user's channel node: reachable through the libp2p relay, answering channel messages. */
+export async function newChannelNode(
+  user: User,
+  chain: ChainAdapter,
+  relayAddr: string,
+  options: Pick<ChannelDeps, 'approveOpen' | 'confirmPayment'> = {},
+): Promise<ChannelNode> {
+  const p2p = new P2PService(await createPeerNode({ relays: [relayAddr] }));
+  const { wallet, keys, pool } = user;
+  const channels = new ChannelService({ wallet, keys, chain, pool, prover, p2p, repository: new ChannelRepository(wallet), ...options });
+  await channels.listen();
+  await p2p.waitForRelay();
+  return { p2p, channels, disputes: new DisputeService({ wallet, keys, chain, pool, prover, channels }) };
 }

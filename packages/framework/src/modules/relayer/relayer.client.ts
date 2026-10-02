@@ -1,6 +1,14 @@
 import { AppError } from '../../shared/errors/AppError.ts';
+import { tokenAddress } from '../chain/index.ts';
 import { RelayResultSchema, RelayerInfoSchema, type RelayRequest, type RelayResult, type RelayerInfo, type RelayerPort } from './relayer.schema.ts';
 import type { RelayerService } from './relayer.service.ts';
+
+/** The relayer's quoted fee for a token (0 = ETH), or an error if it does not accept that token. */
+export function quotedFee(info: RelayerInfo, token: bigint): bigint {
+  const fee = info.fees[tokenAddress(token).toLowerCase()];
+  if (fee === undefined) throw new AppError(409, 'TOKEN_NOT_ACCEPTED', 'This relayer does not accept fees in that token');
+  return BigInt(fee);
+}
 
 /** A relayer reached over HTTP (the desktop client's relayer mode serves this API). */
 export class HttpRelayer implements RelayerPort {

@@ -114,6 +114,12 @@ export class ChainAdapter {
     return this.client.readContract({ address: this.contracts().disputes, abi: disputesAbi, functionName: 'isFinalized', args: [channelNullifier] });
   }
 
+  /** Shortest and longest dispute window the deployed contract accepts, in seconds. */
+  async windowBounds(): Promise<{ min: bigint; max: bigint }> {
+    const [min, max] = await this.client.readContract({ address: this.contracts().disputes, abi: disputesAbi, functionName: 'windowBounds' });
+    return { min, max };
+  }
+
   async blockTimestamp(): Promise<bigint> {
     return (await this.client.getBlock()).timestamp;
   }
