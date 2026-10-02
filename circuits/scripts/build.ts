@@ -2,7 +2,7 @@
 // perpetual powers-of-tau (phase 1), and publishes the artifacts:
 //   circuits/build/<name>/            r1cs, wasm, sym, zkey, verification key
 //   packages/framework/artifacts/     <name>.wasm + <name>.zkey for proving
-//   contracts/pool/src/generated/vk.rs verifying keys for the Stylus verifier
+//   contracts/core/src/generated/vk.rs verifying keys for the Stylus verifier
 // Rebuilds only what changed (keyed by a hash of the circuit sources). `--fresh-setup` forces a new setup.
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -17,7 +17,7 @@ const circuitsDir = resolve(here, '..');
 const repo = resolve(circuitsDir, '..');
 const buildDir = join(circuitsDir, 'build');
 const frameworkArtifacts = join(repo, 'packages/framework/artifacts');
-const generatedRust = join(repo, 'contracts/pool/src/generated');
+const generatedRust = join(repo, 'contracts/core/src/generated');
 
 export const CIRCUITS = ['transfer', 'finalize', 'reclaim', 'submit_state'] as const;
 const PTAU = process.env.OCCULTA_PTAU ?? join(homedir(), '.local/share/occulta-tools/ptau/ppot_0080_17.ptau');

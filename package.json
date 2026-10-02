@@ -13,20 +13,20 @@
     "e2e"
   ],
   "scripts": {
-    "setup": "node scripts/setup.mjs",
+    "setup": "node scripts/setup.ts",
     "build:circuits": "npm run build -w @occulta/circuits",
-    "build:contracts": "node scripts/build-contracts.mjs",
-    "devnode": "node scripts/devnode.mjs",
-    "deploy:devnode": "node scripts/deploy.mjs --network devnode",
+    "build:contracts": "node scripts/build-contracts.ts",
+    "devnode": "node scripts/devnode.ts",
+    "deploy:devnode": "node scripts/deploy.ts",
     "lint": "eslint .",
-    "typecheck": "tsc -b tsconfig.json",
-    "test": "node scripts/test-all.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node scripts/test-all.ts",
     "test:unit": "vitest run --project framework --project desktop --project web",
     "test:circuits": "vitest run --project circuits",
     "test:contracts": "cargo test --manifest-path contracts/Cargo.toml",
     "test:integration": "vitest run --project integration",
     "test:ui": "playwright test -c e2e/playwright.config.ts",
-    "test:impact": "node scripts/test-impact.mjs"
+    "test:impact": "node scripts/test-impact.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,9 +34,10 @@
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.11.0",
     "globals": "^17.13.0",
-    "tsx": "^4.23.15",
+    "solc": "^0.8.37",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.0",
+    "viem": "^2.57.2",
     "vitest": "^5.0.3"
   }
 }

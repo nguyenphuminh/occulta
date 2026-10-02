@@ -1,0 +1,10 @@
+{
+  "name": "@occulta/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Integration tests on a local Nitro dev node and UI tests of the wallet website",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

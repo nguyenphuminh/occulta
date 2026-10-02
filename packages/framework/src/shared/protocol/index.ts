@@ -8,3 +8,4 @@ export * from './extdata.ts';
 export * from './eddsa.ts';
 export * from './encryption.ts';
 export * from './witness.ts';
+export * from './proof.ts';

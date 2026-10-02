@@ -24,7 +24,7 @@ target/
 
 # --- generated circuit and contract artifacts (recreated by `npm run setup`) ---
 circuits/build/
-contracts/pool/src/generated/
+contracts/core/src/generated/
 packages/framework/artifacts/
 apps/web/public/artifacts/
 

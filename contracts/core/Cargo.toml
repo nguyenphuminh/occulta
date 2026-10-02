@@ -1,0 +1,17 @@
+[package]
+name = "occulta-core"
+version = "0.1.0"
+edition = "2021"
+description = "Field arithmetic, Poseidon, Merkle tree and Groth16 verification shared by the Occulta contracts"
+publish = false
+
+[dependencies]
+alloy-primitives = { workspace = true }
+hex-literal = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Native BN254 backend for host builds (the library Ethereum clients use for the BN254 precompiles).
+bn = { package = "substrate-bn", version = "0.6" }
+
+[dev-dependencies]
+serde_json = "1"
