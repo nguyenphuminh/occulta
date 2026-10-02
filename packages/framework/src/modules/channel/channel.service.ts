@@ -1,7 +1,7 @@
 import { bytesToHex, concatHex, zeroAddress } from 'viem';
 import type { z } from 'zod';
 import { AppError, isAppError } from '../../shared/errors/AppError.ts';
-import type { Prover } from '../../shared/integrations/prover.ts';
+import type { ProverPort } from '../../shared/integrations/prover.ts';
 import {
   FIELD_SIZE,
   MAX_AMOUNT,
@@ -81,7 +81,7 @@ export interface ChannelDeps {
   keys: KeyRing;
   chain: ChainAdapter;
   pool: PoolService;
-  prover: Prover;
+  prover: ProverPort;
   p2p: P2PService;
   repository: ChannelRepository;
   /**
@@ -170,7 +170,7 @@ export class ChannelService {
     if ((pool.balances(account).get(o.token) ?? 0n) < o.amount) throw new AppError(409, 'INSUFFICIENT_FUNDS', 'Not enough shielded funds to fund this channel');
 
     const poolKeys = await keys.poolKeys(account);
-    const { index, secrets } = await keys.newChannel(account);
+    const { index, secrets } = await keys.newChannel(account, this.deps.chain.network.id);
     const pkA = channelPublicKeyOf(secrets.signingKey);
     const tagA = ownerTagOf(secrets.tagSecret);
     const shareA = randomFieldElement();
@@ -192,7 +192,8 @@ export class ChannelService {
       tagA,
       encPubA,
       contribA,
-      addrsA: p2p.relayAddresses(),
+      // B answers and later pays through these, so A must hold a relay reservation first.
+      addrsA: await p2p.waitForRelay(),
     };
     const reply = parseReply(OpenReplySchema, await p2p.request(invite, open));
     if (reply.contribB ? reply.contribB.amount !== peerAmount : peerAmount !== 0n) throw new AppError(502, 'BAD_REPLY', 'The other party answered with a different contribution');
@@ -452,7 +453,7 @@ export class ChannelService {
     }
 
     const poolKeys = await keys.poolKeys(account);
-    const { index, secrets } = await keys.newChannel(account);
+    const { index, secrets } = await keys.newChannel(account, this.deps.chain.network.id);
     const pkB = channelPublicKeyOf(secrets.signingKey);
     const tagB = ownerTagOf(secrets.tagSecret);
     const shareB = randomFieldElement();

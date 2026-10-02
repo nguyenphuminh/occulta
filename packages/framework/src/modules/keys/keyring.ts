@@ -33,22 +33,23 @@ export class KeyRing {
     this.cache.clear();
   }
 
-  channelCount(accountId?: string): number {
-    return this.wallet.readSection(SECTION, KeysSectionSchema, accountId)?.channelCount ?? 0;
+  /** Without `networkId`, the selected network at the time of the call. */
+  channelCount(accountId?: string, networkId?: string): number {
+    return this.wallet.readSection(SECTION, KeysSectionSchema, accountId, networkId)?.channelCount ?? 0;
   }
 
   /** Reserves the next channel index and returns its secrets. */
-  async newChannel(accountId?: string): Promise<{ index: number; secrets: ChannelSecrets }> {
-    const index = this.channelCount(accountId);
-    await this.wallet.writeSection(SECTION, { channelCount: index + 1 }, accountId);
+  async newChannel(accountId?: string, networkId?: string): Promise<{ index: number; secrets: ChannelSecrets }> {
+    const index = this.channelCount(accountId, networkId);
+    await this.wallet.writeSection(SECTION, { channelCount: index + 1 }, accountId, networkId);
     return { index, secrets: channelSecrets(await this.poolKeys(accountId), index) };
   }
 
   /** Owner tags of all channel payout/refund secrets in use (plus a margin), for note discovery. */
-  async channelTags(accountId?: string, margin = 16): Promise<Map<bigint, number>> {
+  async channelTags(accountId?: string, networkId?: string, margin = 16): Promise<Map<bigint, number>> {
     const keys = await this.poolKeys(accountId);
     const tags = new Map<bigint, number>();
-    for (let i = 0; i < this.channelCount(accountId) + margin; i++) tags.set(ownerTagOf(channelSecrets(keys, i).tagSecret), i);
+    for (let i = 0; i < this.channelCount(accountId, networkId) + margin; i++) tags.set(ownerTagOf(channelSecrets(keys, i).tagSecret), i);
     return tags;
   }
 }

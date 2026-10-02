@@ -6,5 +6,8 @@
   "description": "Integration tests on a local Nitro dev node and UI tests of the wallet website",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

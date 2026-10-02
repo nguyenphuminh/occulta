@@ -207,22 +207,23 @@ export class WalletService {
 
   // --- data other modules keep per account and network ---
 
-  readSection<T>(section: string, schema: z.ZodType<T>, accountId?: string): T | undefined {
+  /** Without `accountId` / `networkId`, the active account and the selected network at the time of the call. */
+  readSection<T>(section: string, schema: z.ZodType<T>, accountId?: string, networkId?: string): T | undefined {
     const doc = this.unlocked();
-    const value = doc.sections[this.sectionKey(section, accountId)];
+    const value = doc.sections[this.sectionKey(section, accountId, networkId)];
     return value === undefined ? undefined : schema.parse(value);
   }
 
-  async writeSection(section: string, value: unknown, accountId?: string): Promise<void> {
-    this.unlocked().sections[this.sectionKey(section, accountId)] = value;
+  async writeSection(section: string, value: unknown, accountId?: string, networkId?: string): Promise<void> {
+    this.unlocked().sections[this.sectionKey(section, accountId, networkId)] = value;
     await this.persist();
   }
 
   // --- internals ---
 
-  private sectionKey(section: string, accountId?: string): string {
+  private sectionKey(section: string, accountId?: string, networkId?: string): string {
     const doc = this.unlocked();
-    return `${accountId ?? doc.activeAccountId}/${doc.networkId}/${section}`;
+    return `${accountId ?? doc.activeAccountId}/${networkId ?? doc.networkId}/${section}`;
   }
 
   private unlocked(): WalletDocument {

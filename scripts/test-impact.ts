@@ -20,6 +20,7 @@ const RULES: [RegExp, Tier[]][] = [
   [/^apps\/web\//, ['web', 'ui']],
   [/^e2e\/integration\//, ['integration']],
   [/^e2e\/contracts\//, ['integration', 'ui']],
+  [/^e2e\/lib\//, ['integration', 'ui']],
   [/^e2e\//, ['ui']],
   [/^scripts\//, ['integration', 'ui']],
   [/^(package(-lock)?\.json|tsconfig\.base\.json|eslint\.config\.js|vitest\.config\.ts)$/, ALL],

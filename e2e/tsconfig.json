@@ -1,9 +1,21 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM"],
-    "types": ["node"],
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ],
     "noEmit": true
   },
-  "include": ["integration", "ui", "../scripts/lib", "../packages/framework/src/types"]
+  "include": [
+    "integration",
+    "ui",
+    "lib",
+    "playwright.config.ts",
+    "../scripts/lib",
+    "../packages/framework/src/types"
+  ]
 }

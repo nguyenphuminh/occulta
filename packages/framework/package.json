@@ -21,6 +21,7 @@
     "@libp2p/crypto": "^5.1.23",
     "@libp2p/identify": "^4.1.14",
     "@libp2p/interface": "^3.3.0",
+    "@libp2p/ping": "^3.1.13",
     "@libp2p/tcp": "^11.0.28",
     "@libp2p/utils": "^7.4.1",
     "@libp2p/websockets": "^10.1.21",

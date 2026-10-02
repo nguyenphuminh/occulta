@@ -1,6 +1,6 @@
 import { bytesToHex, concatHex, zeroAddress, type Hex } from 'viem';
 import { AppError } from '../../shared/errors/AppError.ts';
-import type { Prover } from '../../shared/integrations/prover.ts';
+import type { ProverPort } from '../../shared/integrations/prover.ts';
 import {
   channelNullifierOf,
   dummyInput,
@@ -36,7 +36,7 @@ export interface DisputeDeps {
   keys: KeyRing;
   chain: ChainAdapter;
   pool: PoolService;
-  prover: Prover;
+  prover: ProverPort;
   channels: ChannelService;
 }
 

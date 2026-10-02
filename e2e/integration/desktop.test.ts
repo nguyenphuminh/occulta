@@ -1,9 +1,8 @@
 // The desktop client as a user runs it: real processes, its data folder, the local RPC server, and
 // its relayer and libp2p relay roles serving a website-style user, against the dev node.
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -17,65 +16,12 @@ import { encodeInvite } from '../../packages/framework/src/modules/p2p/index.ts'
 import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.ts';
 import { MemoryStore } from '../../packages/framework/src/modules/storage/index.ts';
 import { WalletRepository, WalletService } from '../../packages/framework/src/modules/wallet/index.ts';
-import { REPO, devChain } from '../../scripts/lib/devnode.ts';
+import { devChain } from '../../scripts/lib/devnode.ts';
+import { desktopRpc, freePort, runDesktop as run, startDesktop as startNode, stopDesktop as stop } from '../lib/desktop-process.ts';
 import { client, dev, freshDeployment } from './chain.ts';
 import { devNetwork, newChannelNode, newUser, type ChannelNode } from './services.ts';
 
-const MAIN = join(REPO, 'apps/desktop/src/main.ts');
 const ETH = 0n;
-
-interface Ready {
-  account: string;
-  network: string;
-  rpc: { url: string; tokenFile: string } | null;
-  relayer: string | null;
-  libp2pRelay: string[] | null;
-}
-
-const freePort = () =>
-  new Promise<number>((resolve) => {
-    const server = createServer().listen(0, '127.0.0.1', () => {
-      const { port } = server.address() as AddressInfo;
-      server.close(() => resolve(port));
-    });
-  });
-
-function launch(args: string[], env: Record<string, string>): ChildProcess {
-  return spawn(process.execPath, [MAIN, ...args], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
-/** Runs a command that exits by itself. */
-function run(args: string[], env: Record<string, string>): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  const child = launch(args, env);
-  let stdout = '';
-  let stderr = '';
-  child.stdout?.on('data', (c: Buffer) => (stdout += c.toString()));
-  child.stderr?.on('data', (c: Buffer) => (stderr += c.toString()));
-  return new Promise((resolve) => child.on('exit', (code) => resolve({ code, stdout, stderr })));
-}
-
-/** Starts a node and waits for its "occulta ready" line. */
-function startNode(args: string[], env: Record<string, string>): Promise<{ child: ChildProcess; ready: Ready }> {
-  const child = launch(args, env);
-  let stderr = '';
-  child.stderr?.on('data', (c: Buffer) => (stderr += c.toString()));
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    child.stdout?.on('data', (c: Buffer) => {
-      stdout += c.toString();
-      const line = stdout.split('\n').find((l) => l.startsWith('occulta ready '));
-      if (line) resolve({ child, ready: JSON.parse(line.slice('occulta ready '.length)) as Ready });
-    });
-    child.on('exit', (code) => reject(new Error(`node exited with ${code}: ${stderr}`)));
-  });
-}
-
-function stop(child: ChildProcess): Promise<number | null> {
-  return new Promise((resolve) => {
-    child.on('exit', (code) => resolve(code));
-    child.kill('SIGTERM');
-  });
-}
 
 describe('desktop client on the dev node', () => {
   const phrase = generateMnemonic(wordlist, 128);
@@ -93,12 +39,7 @@ describe('desktop client on the dev node', () => {
   const children: ChildProcess[] = [];
   const nodes: ChannelNode[] = [];
 
-  async function rpc<T>(command: string, body: object = {}): Promise<T> {
-    const res = await fetch(`${rpcUrl}/rpc/${command}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
-    const payload = (await res.json()) as T & { code?: string; message?: string };
-    if (!res.ok) throw Object.assign(new Error(payload.message), { code: payload.code, status: res.status });
-    return payload;
-  }
+  const rpc = <T>(command: string, body: object = {}): Promise<T> => desktopRpc<T>({ url: rpcUrl, token }, command, body);
 
   beforeAll(async () => {
     const deployment = await freshDeployment();

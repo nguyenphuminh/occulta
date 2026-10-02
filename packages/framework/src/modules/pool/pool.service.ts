@@ -1,6 +1,6 @@
 import { bytesToHex, concatHex, hexToBytes, zeroAddress, type Address, type Hex } from 'viem';
 import { AppError } from '../../shared/errors/AppError.ts';
-import type { Prover } from '../../shared/integrations/prover.ts';
+import type { ProverPort } from '../../shared/integrations/prover.ts';
 import {
   MerkleTree,
   decryptNote,
@@ -29,7 +29,7 @@ export interface PoolDeps {
   wallet: WalletService;
   keys: KeyRing;
   chain: ChainAdapter;
-  prover: Prover;
+  prover: ProverPort;
   repository: PoolRepository;
 }
 
@@ -105,10 +105,12 @@ export class PoolService {
   /** Trial-decrypts every new pool event for the account and marks its spent notes. */
   async sync(accountId?: string): Promise<void> {
     const { keys: keyring, repository } = this.deps;
+    // Fixed once: the user may switch account while the sync runs.
+    const account = accountId ?? this.deps.wallet.activeAccount().id;
     await this.refreshChain();
-    const keys = await keyring.poolKeys(accountId);
-    const channelTags = await keyring.channelTags(accountId);
-    const section = repository.load(accountId);
+    const keys = await keyring.poolKeys(account);
+    const channelTags = await keyring.channelTags(account, this.deps.chain.network.id);
+    const section = repository.load(account);
     const known = new Set(section.notes.map((n) => n.commitment));
     for (const event of this.events) {
       if (event.blockNumber <= section.syncedBlock || known.has(event.commitment)) continue;
@@ -121,7 +123,7 @@ export class PoolService {
     }
     this.markSpent(section.notes, keys);
     section.syncedBlock = this.scannedTo;
-    await repository.save(section, accountId);
+    await repository.save(section, account);
   }
 
   /**
@@ -129,13 +131,15 @@ export class PoolService {
    * whose salt comes from the state (BRD 2.2.9), once it is in the pool.
    */
   async adopt(note: NotePreimage, secret: StoredNote['secret'], accountId?: string): Promise<boolean> {
+    const account = accountId ?? this.deps.wallet.activeAccount().id;
     const commitment = noteCommitment(note);
     if (note.amount === 0n || !this.hasCommitment(commitment)) return false;
-    const section = this.deps.repository.load(accountId);
+    const keys = await this.deps.keys.poolKeys(account);
+    const section = this.deps.repository.load(account);
     if (section.notes.some((n) => n.commitment === commitment)) return true;
     section.notes.push({ ...note, commitment, leafIndex: this.tree.indexOf(commitment), secret, spent: false });
-    this.markSpent(section.notes, await this.deps.keys.poolKeys(accountId));
-    await this.deps.repository.save(section, accountId);
+    this.markSpent(section.notes, keys);
+    await this.deps.repository.save(section, account);
     return true;
   }
 
@@ -188,7 +192,8 @@ export class PoolService {
     relayer: RelayerPort;
     accountId?: string;
   }): Promise<Hex> {
-    const { token, payment, publicAmount, recipient, relayer, accountId } = args;
+    const { token, payment, publicAmount, recipient, relayer } = args;
+    const accountId = args.accountId ?? this.deps.wallet.activeAccount().id;
     await this.sync(accountId);
     const keys = await this.deps.keys.poolKeys(accountId);
     const info = await relayer.info();

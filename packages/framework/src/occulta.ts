@@ -1,7 +1,7 @@
 import type { Libp2p } from '@libp2p/interface';
 import { concat, hexToBytes, keccak256, stringToHex } from 'viem';
 import { AppError } from './shared/errors/AppError.ts';
-import { Prover, type ArtifactLoader } from './shared/integrations/prover.ts';
+import { Prover, type ArtifactLoader, type ProverPort } from './shared/integrations/prover.ts';
 import { BUILT_IN_NETWORKS, ChainAdapter, tokenAddress, type NetworkConfig } from './modules/chain/index.ts';
 import { ChannelRepository, ChannelService, type ChannelDeps, type TickProblem } from './modules/channel/index.ts';
 import { DisputeService } from './modules/dispute/index.ts';
@@ -18,6 +18,8 @@ export interface OccultaOptions {
   store: KeyValueStore;
   /** Where the circuits' proving files come from (files in Node.js, URLs in the browser). */
   artifacts: ArtifactLoader;
+  /** Proves with this instead of snarkjs on the calling thread (the website proves in a Web Worker). */
+  prover?: ProverPort;
   /** Creates the libp2p node: createPeerNode from "./libp2p-node" or createBrowserNode from "./libp2p-browser". */
   createNode: (options: { relays: string[]; seed: Uint8Array }) => Promise<Libp2p>;
   /** Chain configurations; the four built-in ones by default. A custom one is added here. */
@@ -57,14 +59,14 @@ export class Occulta {
   readonly wallet: WalletService;
   readonly keys: KeyRing;
   private options: OccultaOptions;
-  private readonly prover: Prover;
+  private readonly prover: ProverPort;
   private session: Session | null = null;
 
   constructor(options: OccultaOptions) {
     this.options = options;
     this.wallet = new WalletService(new WalletRepository(options.store), options.kdf);
     this.keys = new KeyRing(this.wallet);
-    this.prover = new Prover(options.artifacts);
+    this.prover = options.prover ?? new Prover(options.artifacts);
   }
 
   /** Changes settings a user can edit (e.g. adding a relay); they apply from the next start(). */
@@ -89,12 +91,14 @@ export class Occulta {
    * switching account or network). P2P, and with it channels, start only if libp2p relays are known.
    */
   async start(): Promise<void> {
-    await this.stop();
+    // The account's libp2p identity must be free before a new node takes it; until the new
+    // services are ready, the previous ones stay reachable (their data stays on their own network).
+    await this.session?.p2p?.stop();
     const { wallet, keys, prover, options } = this;
     const accountId = wallet.activeAccount().id;
     const network = this.network();
     const chain = new ChainAdapter(network);
-    const pool = new PoolService({ wallet, keys, chain, prover, repository: new PoolRepository(wallet) });
+    const pool = new PoolService({ wallet, keys, chain, prover, repository: new PoolRepository(wallet, network.id) });
     const session: Session = { accountId, network, chain, pool, p2p: null, channels: null, disputes: null };
     const relays = options.libp2pRelays ?? network.libp2pRelays;
     if (relays.length > 0) {
@@ -108,7 +112,7 @@ export class Occulta {
         pool,
         prover,
         p2p,
-        repository: new ChannelRepository(wallet),
+        repository: new ChannelRepository(wallet, network.id),
         approveOpen: options.approveOpen,
         confirmPayment: options.confirmPayment,
         window: options.disputeWindow,

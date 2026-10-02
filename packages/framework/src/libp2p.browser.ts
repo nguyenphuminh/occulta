@@ -5,6 +5,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPairFromSeed } from '@libp2p/crypto/keys';
 import { identify } from '@libp2p/identify';
+import { ping } from '@libp2p/ping';
 import type { Libp2p } from '@libp2p/interface';
 import { webSockets } from '@libp2p/websockets';
 import { createLibp2p } from 'libp2p';
@@ -16,7 +17,7 @@ export async function createBrowserNode(options: { relays: string[]; seed?: Uint
     transports: [webSockets(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    services: { identify: identify() },
+    services: { identify: identify(), ping: ping() },
     // Allow relays on local or LAN addresses (e.g. a desktop client relaying on the same machine),
     // which libp2p refuses to dial by default. Peers stay relayed: this node has no transport that
     // could listen directly, so it never advertises an address of its own.

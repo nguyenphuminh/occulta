@@ -46,6 +46,16 @@ describe('peer-to-peer messaging through a relay', () => {
     await expect(alice.request(bob.invite('x'), { type: 'refuse' })).rejects.toMatchObject({ code: 'NOT_NOW', message: 'Bob says no' });
   });
 
+  it('keeps relayed connections through libp2p\u2019s connection health checks', async () => {
+    // libp2p pings every connection every 10 s and drops connections that cannot answer.
+    const target = bob.invite('x');
+    await alice.request(target, { type: 'hello', n: 1 });
+    await new Promise((r) => setTimeout(r, 12_000));
+    expect(bob.relayAddresses().length).toBeGreaterThan(0);
+    expect(alice.node.getConnections().length).toBeGreaterThan(0);
+    expect(await alice.request(target, { type: 'hello', n: 2 })).toMatchObject({ echo: 2 });
+  }, 30_000);
+
   it('reports an unreachable peer', async () => {
     const gone = { ...bob.invite('x'), addrs: [bob.invite('x').addrs[0]!.replace(bob.peerId, alice.peerId.replace(/.$/, 'X'))] };
     await expect(alice.request(gone, { type: 'hello' })).rejects.toMatchObject({ code: 'PEER_UNREACHABLE' });

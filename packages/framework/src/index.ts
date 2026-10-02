@@ -5,7 +5,7 @@ export type { OccultaOptions } from './occulta.ts';
 
 export { AppError, isAppError } from './shared/errors/AppError.ts';
 export { Prover, fileArtifacts, urlArtifacts } from './shared/integrations/prover.ts';
-export type { ArtifactLoader, CircuitName } from './shared/integrations/prover.ts';
+export type { ArtifactLoader, CircuitName, ProofResult, ProverPort } from './shared/integrations/prover.ts';
 
 export * from './modules/chain/index.ts';
 export * from './modules/channel/index.ts';

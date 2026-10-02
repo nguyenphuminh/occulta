@@ -1,0 +1,89 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { expect, type Locator, type Page } from '@playwright/test';
+import { parseEther, type Address } from 'viem';
+import { devChain } from '../../scripts/lib/devnode.ts';
+import { client, dev } from '../integration/chain.ts';
+
+export const PASSWORD = 'correct horse battery';
+
+/** The dev network the website was built with (set by the global setup). */
+export function devNetworkInfo(): { id: string; name: string; usdg: string } {
+  return JSON.parse(process.env.OCCULTA_UI_NETWORK as string) as { id: string; name: string; usdg: string };
+}
+
+export const card = (page: Page, title: string): Locator => page.getByRole('region', { name: title, exact: true });
+
+/** Creates a wallet through the website's flow and returns its recovery phrase. */
+export async function createWallet(page: Page): Promise<string> {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create a new wallet' }).click();
+  const words = await page.getByRole('list', { name: 'Recovery phrase' }).locator('li').allTextContents();
+  expect(words).toHaveLength(12);
+  await page.getByRole('button', { name: 'I wrote it down' }).click();
+  for (const label of await page.locator('.field > label').allTextContents()) {
+    await page.getByLabel(label, { exact: true }).fill(words[Number(label.replace('Word #', '')) - 1] as string);
+  }
+  await page.getByRole('button', { name: 'Confirm words' }).click();
+  await setPassword(page, 'Create wallet');
+  return words.join(' ');
+}
+
+export async function setPassword(page: Page, submit: string): Promise<void> {
+  await page.getByLabel('Wallet password', { exact: true }).fill(PASSWORD);
+  await page.getByLabel('Repeat the password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: submit }).click();
+  await expect(page.getByRole('button', { name: 'Lock' })).toBeVisible();
+}
+
+export async function useDevNetwork(page: Page): Promise<void> {
+  const { id } = devNetworkInfo();
+  await page.getByLabel('Network', { exact: true }).selectOption(id);
+  await expect(page.getByLabel('Network', { exact: true })).toHaveValue(id);
+}
+
+/** The dev account sends one transaction at a time, so concurrent funding never reuses a nonce. */
+let devQueue: Promise<unknown> = Promise.resolve();
+
+/** Sends test ETH to the active account's public address and returns that address. */
+export async function fundPublicly(page: Page, eth: string): Promise<Address> {
+  await page.getByRole('link', { name: 'Public' }).click();
+  const address = (await page.getByTestId('public-address').textContent()) as Address;
+  const send = devQueue.then(async () =>
+    client.waitForTransactionReceipt({ hash: await dev.sendTransaction({ account: dev.account!, chain: devChain, to: address, value: parseEther(eth) }) }),
+  );
+  devQueue = send.catch(() => undefined);
+  await send;
+  return address;
+}
+
+/** Confirms a relayed action's review dialog and waits for it to finish. */
+export async function confirmRelayed(page: Page, label: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: `Confirm: ${label}` });
+  await expect(dialog).toContainText('Relayer fee: 0.0001 ETH');
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await expect(dialog).toBeHidden({ timeout: 120_000 });
+}
+
+/** Debugging aid: OCCULTA_UI_CONSOLE=<file> appends every console line of a page to that file. */
+export function recordConsole(page: Page, name: string): void {
+  const file = process.env.OCCULTA_UI_CONSOLE;
+  if (!file) return;
+  if (process.env.OCCULTA_UI_DEBUG) void page.addInitScript((debug) => localStorage.setItem('debug', debug), process.env.OCCULTA_UI_DEBUG);
+  page.on('console', (m) => appendFileSync(file, `${new Date().toISOString()} [${name}] ${m.type()} ${m.text()}\n`));
+  page.on('pageerror', (e) => appendFileSync(file, `${new Date().toISOString()} [${name}] pageerror ${e.message}\n`));
+}
+
+/** Debugging aid: OCCULTA_UI_PROFILE=<file> records a CPU profile of `page` while `run` runs. */
+export async function profiled<T>(page: Page, run: () => Promise<T>): Promise<T> {
+  const file = process.env.OCCULTA_UI_PROFILE;
+  if (!file) return run();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.start');
+  try {
+    return await run();
+  } finally {
+    const { profile } = await cdp.send('Profiler.stop');
+    writeFileSync(file, JSON.stringify(profile));
+  }
+}

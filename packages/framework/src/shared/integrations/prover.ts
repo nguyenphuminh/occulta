@@ -11,8 +11,13 @@ export interface ProofResult {
   signals: bigint[];
 }
 
+/** Anything that builds Groth16 proofs, e.g. the website's prover running in a Web Worker. */
+export interface ProverPort {
+  prove(circuit: CircuitName, input: CircuitInput): Promise<ProofResult>;
+}
+
 /** Groth16 proving with snarkjs, on the user's own device (BRD 2.2.1). */
-export class Prover {
+export class Prover implements ProverPort {
   private readonly load: ArtifactLoader;
 
   constructor(load: ArtifactLoader) {

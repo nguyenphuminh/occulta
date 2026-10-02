@@ -5,6 +5,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { circuitRelayServer, circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { generateKeyPairFromSeed } from '@libp2p/crypto/keys';
 import { identify } from '@libp2p/identify';
+import { ping } from '@libp2p/ping';
 import type { Libp2p } from '@libp2p/interface';
 import { tcp } from '@libp2p/tcp';
 import { webSockets } from '@libp2p/websockets';
@@ -24,7 +25,7 @@ export async function createRelayNode(options: { listen: string[]; seed?: Uint8A
     transports: [tcp(), webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    services: { identify: identify(), relay: circuitRelayServer({ reservations: RELAY_LIMITS }) },
+    services: { identify: identify(), ping: ping(), relay: circuitRelayServer({ reservations: RELAY_LIMITS }) },
   });
 }
 
@@ -39,6 +40,6 @@ export async function createPeerNode(options: { relays: string[]; seed?: Uint8Ar
     transports: [tcp(), webSockets(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    services: { identify: identify() },
+    services: { identify: identify(), ping: ping() },
   });
 }
