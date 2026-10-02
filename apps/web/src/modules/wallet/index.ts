@@ -1,1 +1,2 @@
-export { Header } from './Header.tsx';
+export { AccountBar } from './AccountBar.tsx';
+export { Accounts } from './Accounts.tsx';

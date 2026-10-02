@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { mnemonicToAccount, privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, setPassword, unlock, useDevNetwork } from './helpers.ts';
+import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, goHome, openAction, openChannels, openSettings, phraseWords, setPassword, unlock, useDevNetwork } from './helpers.ts';
 
 /** Everything this website stored in IndexedDB, as text. */
 async function storedText(page: Page): Promise<string> {
@@ -24,8 +24,10 @@ test('creating a wallet: the phrase is shown once, 3 words must match, the passw
   await page.goto('/');
   await expect(page.getByText('Occulta only ever asks for your recovery phrase when you import a wallet')).toBeVisible();
   await page.getByRole('button', { name: 'Create a new wallet' }).click();
-  const words = await page.getByRole('list', { name: 'Recovery phrase' }).locator('li').allTextContents();
+  const words = await phraseWords(page);
   expect(words).toHaveLength(12);
+  await expect(page.getByRole('button', { name: 'I wrote it down' })).toBeDisabled(); // not before confirming it is saved
+  await page.getByLabel('I have written my recovery phrase down').check();
   await page.getByRole('button', { name: 'I wrote it down' }).click();
   await expect(page.getByRole('list', { name: 'Recovery phrase' })).toHaveCount(0); // shown only once
 
@@ -73,6 +75,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await setPassword(page, 'Import wallet');
   await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
 
+  await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
   const second = mnemonicToAccount(phrase, { addressIndex: 1 }).address;
   await expect(page.getByLabel('Account', { exact: true })).toContainText(`Account 2 · ${second.slice(0, 6)}`);
@@ -82,6 +85,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await page.getByRole('dialog').getByRole('button', { name: 'Import' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByLabel('Account', { exact: true }).selectOption(privateKeyToAccount(key).address);
+  await goHome(page);
   await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
 });
 
@@ -92,11 +96,14 @@ test('a wallet imported from a private key has that address and cannot derive ac
   await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(key);
   await setPassword(page, 'Import wallet');
   await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
+  await openSettings(page);
+  await expect(page.getByRole('button', { name: 'Import key' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add account' })).toHaveCount(0);
 });
 
 test('a forgotten password is replaced by importing the phrase, after a warning', async ({ page }) => {
   const phrase = await createWallet(page);
+  await openSettings(page);
   await page.getByRole('button', { name: 'Import key' }).click();
   await page.getByRole('dialog').getByLabel('Private key', { exact: true }).fill(generatePrivateKey());
   await page.getByRole('dialog').getByRole('button', { name: 'Import' }).click();
@@ -110,14 +117,15 @@ test('a forgotten password is replaced by importing the phrase, after a warning'
   await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase);
   await page.getByLabel('New wallet password', { exact: true }).fill('another password');
   await page.getByRole('button', { name: 'Reset wallet' }).click();
+  await goHome(page);
   await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
   await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(1); // the imported key is gone
 });
 
 test('the export file restores the wallet in a fresh browser and records when it was made', async ({ page, browser }) => {
   const phrase = await createWallet(page);
+  await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
-  await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByTestId('last-export')).toHaveText('Last export: never');
   const downloading = page.waitForEvent('download');
   await card(page, 'Export').getByRole('button', { name: 'Download export file' }).click();
@@ -135,6 +143,7 @@ test('the export file restores the wallet in a fresh browser and records when it
   await expect(other.getByRole('alert')).toHaveText('Wrong password');
   await other.getByLabel('Password of the export file', { exact: true }).fill(PASSWORD);
   await other.getByRole('button', { name: 'Restore' }).click();
+  await goHome(other);
   await expect(other.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
   await expect(other.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
   await fresh.close();
@@ -144,14 +153,17 @@ test('each account and each network keeps its own notes and channels; Settings k
   await createWallet(page);
   await useDevNetwork(page);
   await fundPublicly(page, '1');
-  await page.getByRole('link', { name: 'Shielded' }).click();
+  await openAction(page, 'Deposit');
   await card(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
   await card(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+  await expect(card(page, 'Notes').getByText('1 unspent note')).toBeVisible();
 
   // A second account of the same wallet sees none of the first account's notes.
+  await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
   await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
+  await goHome(page);
   await page.getByLabel('Account', { exact: true }).selectOption({ index: 1 });
   await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
   await page.getByLabel('Account', { exact: true }).selectOption({ index: 0 });
@@ -161,12 +173,12 @@ test('each account and each network keeps its own notes and channels; Settings k
   await page.getByLabel('Network', { exact: true }).selectOption('arbitrum-one');
   await expect(page.getByText('Occulta is not deployed on Arbitrum One yet.')).toBeVisible();
   await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
-  await page.getByRole('link', { name: 'Channels' }).click();
+  await openChannels(page);
   await expect(page.getByText('Channels need a libp2p relay. Add one in Settings for this network.')).toBeVisible();
 
   // Relayers and relays added in Settings stay, also after locking, and can be removed.
   const relay = devNetworkInfo().libp2pRelays[0] as string;
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await openSettings(page);
   const relayers = card(page, 'Transaction relayers on Arbitrum One');
   const relays = card(page, 'libp2p relays on Arbitrum One');
   await relayers.getByLabel('Add', { exact: true }).fill('https://relayer.example.com');
@@ -178,13 +190,13 @@ test('each account and each network keeps its own notes and channels; Settings k
   await unlock(page);
   await expect(relayers.getByText('https://relayer.example.com')).toBeVisible();
   await expect(relays.getByText(relay)).toBeVisible();
-  await page.getByRole('link', { name: 'Channels' }).click();
-  await expect(card(page, 'Invite someone')).toBeVisible(); // a relay is now known on this network
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await openChannels(page);
+  await expect(page.getByRole('link', { name: 'Invite', exact: true })).toBeVisible(); // a relay is now known on this network
+  await openSettings(page);
   await relayers.getByRole('listitem').filter({ hasText: 'https://relayer.example.com' }).getByRole('button', { name: 'Remove' }).click();
   await expect(relayers.getByText('https://relayer.example.com')).toHaveCount(0);
 
   await useDevNetwork(page);
-  await page.getByRole('link', { name: 'Shielded' }).click();
+  await goHome(page);
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
 });

@@ -10,7 +10,7 @@ import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.
 import { channelNullifierOf } from '../../packages/framework/src/shared/protocol/index.ts';
 import { mineBlock } from '../integration/chain.ts';
 import { newChannelNode, newUser, type ChannelNode } from '../integration/services.ts';
-import { card, createInvite, createWallet, devSend, fundPublicly, unlock, useDevNetwork } from './helpers.ts';
+import { card, createInvite, createWallet, devSend, fundPublicly, goHome, openAction, openChannel, unlock, useDevNetwork } from './helpers.ts';
 
 const WINDOW = 20n;
 const ETH = 0n;
@@ -50,7 +50,7 @@ test('scenario B: the open wallet answers an old state, finalizes after the dead
   await createWallet(bob);
   await useDevNetwork(bob);
   const opened = await alice.channels.open(decodeInvite(await createInvite(bob)), { token: ETH, amount: parseEther('0.02'), window: WINDOW, relayer });
-  const channel = bob.locator('li.channel').first();
+  const channel = await openChannel(bob);
   await expect(channel).toContainText('Live');
   expect(await alice.channels.tick(relayer)).toEqual([]);
   await alice.channels.pay(opened.id, parseEther('0.01'));
@@ -65,7 +65,7 @@ test('scenario B: the open wallet answers an old state, finalizes after the dead
 
   await passDeadline();
   await expect(channel).toContainText('Settled', { timeout: 120_000 });
-  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await goHome(bob);
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.01 ETH');
   expect(await alice.disputes.tick(relayer)).toEqual([]);
   expect(alice.channels.get(opened.id).status).toBe('settled');
@@ -76,7 +76,7 @@ test('scenario C: a wallet closed for the whole window reclaims its contribution
   await createWallet(bob);
   await useDevNetwork(bob);
   await fundPublicly(bob, '1');
-  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await openAction(bob, 'Deposit');
   await card(bob, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
   await card(bob, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
@@ -84,7 +84,7 @@ test('scenario C: a wallet closed for the whole window reclaims its contribution
   const opening = alice.channels.open(decodeInvite(await createInvite(bob)), { token: ETH, amount: parseEther('0.02'), peerAmount: parseEther('0.01'), window: WINDOW, relayer });
   await bob.getByRole('dialog', { name: 'Channel request' }).getByRole('button', { name: 'Accept and fund' }).click();
   const opened = await opening;
-  const channel = bob.locator('li.channel').first();
+  const channel = await openChannel(bob);
   await expect(channel).toContainText('Live', { timeout: 120_000 }); // Bob funded his side on his own
   expect(await alice.channels.tick(relayer)).toEqual([]);
   expect(alice.channels.get(opened.id).status).toBe('live');
@@ -101,9 +101,8 @@ test('scenario C: a wallet closed for the whole window reclaims its contribution
   // Bob comes back: what Alice had paid him is lost (BRD scenario C), his contribution comes back.
   await bob.goto('/');
   await unlock(bob);
-  await bob.getByRole('link', { name: 'Channels' }).click();
-  await expect(bob.locator('li.channel').first()).toContainText('Settled', { timeout: 120_000 });
-  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await expect(await openChannel(bob)).toContainText('Settled', { timeout: 120_000 });
+  await goHome(bob);
   // 0.1 − 0.01 contribution − 0.0001 funding fee + (0.01 − 0.0001 reclaim fee)
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.0998 ETH');
 });

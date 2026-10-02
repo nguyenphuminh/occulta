@@ -17,8 +17,9 @@ export const card = (page: Page, title: string): Locator => page.getByRole('regi
 export async function createWallet(page: Page): Promise<string> {
   await page.goto('/');
   await page.getByRole('button', { name: 'Create a new wallet' }).click();
-  const words = await page.getByRole('list', { name: 'Recovery phrase' }).locator('li').allTextContents();
+  const words = await phraseWords(page);
   expect(words).toHaveLength(12);
+  await page.getByLabel('I have written my recovery phrase down').check();
   await page.getByRole('button', { name: 'I wrote it down' }).click();
   for (const label of await page.locator('.field > label').allTextContents()) {
     await page.getByLabel(label, { exact: true }).fill(words[Number(label.replace('Word #', '')) - 1] as string);
@@ -27,6 +28,37 @@ export async function createWallet(page: Page): Promise<string> {
   await setPassword(page, 'Create wallet');
   return words.join(' ');
 }
+
+/** The words of the recovery phrase on screen, in order. */
+export const phraseWords = (page: Page): Promise<string[]> => page.getByRole('list', { name: 'Recovery phrase' }).locator('.phrase-word').allTextContents();
+
+export async function goHome(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
+}
+
+/** Opens one of the home screen's actions: Deposit, Send, Withdraw, Receive or Send publicly. */
+export async function openAction(page: Page, name: 'Deposit' | 'Send' | 'Withdraw' | 'Receive' | 'Send publicly'): Promise<void> {
+  await goHome(page);
+  await page.getByRole('link', { name, exact: true }).click();
+}
+
+export async function openSettings(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings' }).click();
+}
+
+export async function openChannels(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Channels' }).click();
+}
+
+/** Opens the newest channel in the list and returns its conversation. */
+export async function openChannel(page: Page): Promise<Locator> {
+  await openChannels(page);
+  await page.getByTestId('channel-item').first().click();
+  return page.getByRole('region', { name: 'Channel', exact: true });
+}
+
+/** The conversation currently shown. */
+export const channelView = (page: Page): Locator => page.getByRole('region', { name: 'Channel', exact: true });
 
 export async function setPassword(page: Page, submit: string): Promise<void> {
   await page.getByLabel('Wallet password', { exact: true }).fill(PASSWORD);
@@ -52,7 +84,7 @@ export function devSend<T>(send: () => Promise<T>): Promise<T> {
 
 /** Sends test ETH (and optionally test USDG) to the active account's public address and returns it. */
 export async function fundPublicly(page: Page, eth: string, usdg?: string): Promise<Address> {
-  await page.getByRole('link', { name: 'Public' }).click();
+  await goHome(page);
   const address = (await page.getByTestId('public-address').textContent()) as Address;
   await devSend(async () =>
     client.waitForTransactionReceipt({ hash: await dev.sendTransaction({ account: dev.account!, chain: devChain, to: address, value: parseEther(eth) }) }),
@@ -107,9 +139,10 @@ export async function profiled<T>(page: Page, run: () => Promise<T>): Promise<T>
   }
 }
 
-/** Creates an invite on the Channels page and returns its link. */
+/** Creates an invite on the Channels page and returns its link (it also waits until the wallet is reachable). */
 export async function createInvite(page: Page): Promise<string> {
-  await page.getByRole('link', { name: 'Channels' }).click();
+  await openChannels(page);
+  await page.getByRole('link', { name: 'Invite', exact: true }).click();
   await card(page, 'Invite someone').getByRole('button', { name: 'Create invite' }).click();
   const link = (await page.getByTestId('invite-link').textContent()) as string;
   expect(link).toMatch(/\/#\/invite\/[A-Za-z0-9_-]+$/);

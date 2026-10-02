@@ -4,7 +4,24 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { card, confirmRelayed, createInvite as invite, createWallet, fundPublicly, payInChannel as pay, profiled, recordConsole, unlock, useDevNetwork } from './helpers.ts';
+import {
+  card,
+  channelView,
+  confirmRelayed,
+  createInvite as invite,
+  createWallet,
+  fundPublicly,
+  goHome,
+  openAction,
+  openChannel,
+  openChannels,
+  openSettings,
+  payInChannel as pay,
+  profiled,
+  recordConsole,
+  unlock,
+  useDevNetwork,
+} from './helpers.ts';
 
 async function userWithShieldedEth(browser: Browser, eth: '0.1' | '1'): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
@@ -12,7 +29,7 @@ async function userWithShieldedEth(browser: Browser, eth: '0.1' | '1'): Promise<
   await createWallet(page);
   await useDevNetwork(page);
   await fundPublicly(page, '1');
-  await page.getByRole('link', { name: 'Shielded' }).click();
+  await openAction(page, 'Deposit');
   const deposit = card(page, 'Deposit');
   await deposit.getByRole('button', { name: eth, exact: true }).click();
   await deposit.getByRole('button', { name: 'Deposit' }).click();
@@ -36,8 +53,8 @@ test('a channel from an invite link: open, pay both ways with confirmation, clos
   await open.getByRole('button', { name: 'Open channel' }).click();
   await profiled(alice, () => confirmRelayed(alice, 'Open channel'));
 
-  const aliceChannel = alice.locator('li.channel').first();
-  const bobChannel = bob.locator('li.channel').first();
+  const aliceChannel = channelView(alice); // the opener lands on the new channel
+  const bobChannel = await openChannel(bob);
   await expect(aliceChannel).toContainText('Live');
   await expect(bobChannel).toContainText('Live');
   await expect(aliceChannel.getByTestId('channel-mine')).toHaveText('0.0499 ETH');
@@ -59,7 +76,7 @@ test('a channel from an invite link: open, pay both ways with confirmation, clos
   await confirmRelayed(alice, 'Close channel');
   await expect(aliceChannel).toContainText('Closed');
   await expect(bobChannel).toContainText('Closed');
-  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await goHome(bob);
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.008 ETH');
 });
 
@@ -87,8 +104,8 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
   }
 
   // Bob funds his side on his own once Alice's contribution is in the pool.
-  const aliceChannel = alice.locator('li.channel').first();
-  const bobChannel = bob.locator('li.channel').first();
+  const aliceChannel = channelView(alice);
+  const bobChannel = await openChannel(bob);
   await expect(bobChannel).toContainText('Live', { timeout: 120_000 });
   await expect(aliceChannel).toContainText('Live');
   await expect(bobChannel.getByTestId('channel-mine')).toHaveText('0.02 ETH');
@@ -106,7 +123,7 @@ test('a USDG channel from a pasted invite code; a locked wallet signs nothing un
   await createWallet(alice);
   await useDevNetwork(alice);
   await fundPublicly(alice, '1', '100');
-  await alice.getByRole('link', { name: 'Shielded' }).click();
+  await openAction(alice, 'Deposit');
   const deposit = card(alice, 'Deposit');
   await deposit.getByLabel('Token', { exact: true }).selectOption('usdg');
   await deposit.getByRole('button', { name: '10', exact: true }).click();
@@ -118,15 +135,16 @@ test('a USDG channel from a pasted invite code; a locked wallet signs nothing un
   await useDevNetwork(bob);
   const link = await invite(bob);
   await expect(card(bob, 'Invite someone').getByRole('img', { name: 'Invite QR code' })).toBeVisible();
-  await alice.getByRole('link', { name: 'Channels' }).click();
+  await openChannels(alice);
+  await alice.getByRole('link', { name: 'Open channel', exact: true }).click();
   const open = card(alice, 'Open a channel');
   await open.getByLabel('Invite link or code', { exact: true }).fill(link.split('/invite/')[1] as string);
   await open.getByLabel('Token', { exact: true }).selectOption('usdg');
   await open.getByLabel('You fund (USDG)', { exact: true }).fill('5');
   await open.getByRole('button', { name: 'Open channel' }).click();
   await confirmRelayed(alice, 'Open channel', '0.01 USDG');
-  const aliceChannel = alice.locator('li.channel').first();
-  const bobChannel = bob.locator('li.channel').first();
+  const aliceChannel = channelView(alice);
+  const bobChannel = await openChannel(bob);
   await expect(aliceChannel).toContainText('Live');
   await expect(bobChannel).toContainText('Live');
   await expect(aliceChannel.getByTestId('channel-mine')).toHaveText('4.99 USDG');
@@ -139,17 +157,17 @@ test('a USDG channel from a pasted invite code; a locked wallet signs nothing un
   await expect(aliceChannel.getByRole('alert')).toHaveText('The other party is not reachable right now');
   await expect(aliceChannel.getByTestId('channel-mine')).toHaveText('3.99 USDG');
   await unlock(bob);
-  await card(bob, 'Invite someone').getByRole('button', { name: 'Create invite' }).click(); // reachable again
-  await expect(bob.getByTestId('invite-link')).toBeVisible();
+  await invite(bob); // reachable again
+  await openChannel(bob);
   await pay(alice, aliceChannel, '0.25', true, 'USDG');
   await expect(aliceChannel.getByTestId('channel-mine')).toHaveText('3.24 USDG');
-  await expect(bob.locator('li.channel').first().getByTestId('channel-mine')).toHaveText('1.75 USDG');
+  await expect(bobChannel.getByTestId('channel-mine')).toHaveText('1.75 USDG');
 
   await aliceChannel.getByRole('button', { name: 'Close channel' }).click();
   await confirmRelayed(alice, 'Close channel', '0.01 USDG');
   await expect(aliceChannel).toContainText('Closed');
-  await expect(bob.locator('li.channel').first()).toContainText('Closed');
-  await bob.getByRole('link', { name: 'Shielded' }).click();
+  await expect(bobChannel).toContainText('Closed');
+  await goHome(bob);
   await expect(bob.getByTestId('shielded-usdg')).toHaveText('1.75 USDG');
 });
 
@@ -168,7 +186,7 @@ test('a channel request nobody answers counts as declined', async ({ browser }) 
   await expect(request).toBeVisible();
   await expect(alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('alert')).toHaveText('The other party declined this channel', { timeout: 75_000 });
   await expect(request).toBeHidden();
-  await expect(bob.locator('li.channel')).toHaveCount(0);
+  await expect(bob.getByTestId('channel-item')).toHaveCount(0);
 });
 
 test('a restored export keeps its notes and a live channel, which can still be paid and closed', async ({ browser }) => {
@@ -182,14 +200,15 @@ test('a restored export keeps its notes and a live channel, which can still be p
   await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.03');
   await open.getByRole('button', { name: 'Open channel' }).click();
   await confirmRelayed(alice, 'Open channel');
-  const aliceChannel = alice.locator('li.channel').first();
-  await expect(bob.locator('li.channel').first()).toContainText('Live');
+  const aliceChannel = channelView(alice);
+  const bobChannel = await openChannel(bob);
+  await expect(bobChannel).toContainText('Live');
   await expect(aliceChannel).toContainText('Live');
   await pay(alice, aliceChannel, '0.01', true);
-  await expect(bob.locator('li.channel').first().getByTestId('channel-mine')).toHaveText('0.01 ETH');
+  await expect(bobChannel.getByTestId('channel-mine')).toHaveText('0.01 ETH');
 
   // Bob exports and continues in a fresh browser; the old one is gone.
-  await bob.getByRole('link', { name: 'Settings' }).click();
+  await openSettings(bob);
   const downloading = bob.waitForEvent('download');
   await card(bob, 'Export').getByRole('button', { name: 'Download export file' }).click();
   const file = join(tmpdir(), `occulta-export-${Date.now()}.json`);
@@ -202,12 +221,10 @@ test('a restored export keeps its notes and a live channel, which can still be p
   await restored.getByLabel('Password of the export file', { exact: true }).fill('correct horse battery');
   await restored.getByRole('button', { name: 'Restore' }).click();
   await expect(restored.getByRole('button', { name: 'Lock' })).toBeVisible();
-  await restored.getByRole('link', { name: 'Channels' }).click();
-  const channel = restored.locator('li.channel').first();
+  await invite(restored); // reachable again
+  const channel = await openChannel(restored);
   await expect(channel).toContainText('Live');
   await expect(channel.getByTestId('channel-mine')).toHaveText('0.01 ETH');
-  await card(restored, 'Invite someone').getByRole('button', { name: 'Create invite' }).click(); // reachable again
-  await expect(restored.getByTestId('invite-link')).toBeVisible();
 
   await pay(alice, aliceChannel, '0.002', true);
   await expect(channel.getByTestId('channel-mine')).toHaveText('0.012 ETH');
@@ -215,6 +232,6 @@ test('a restored export keeps its notes and a live channel, which can still be p
   await confirmRelayed(restored, 'Close channel');
   await expect(channel).toContainText('Closed');
   await expect(aliceChannel).toContainText('Closed');
-  await restored.getByRole('link', { name: 'Shielded' }).click();
+  await goHome(restored);
   await expect(restored.getByTestId('shielded-eth')).toHaveText('0.012 ETH');
 });

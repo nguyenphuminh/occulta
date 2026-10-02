@@ -1,7 +1,9 @@
 import { cloneElement, useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { isAppError, isRoundAmount, quotedFee, type RelayerPort } from '@occulta/framework';
 import { formatAmount, parseAmount, SYMBOL, type TokenName } from './amounts.ts';
+import { BackIcon, CopyIcon, Logo } from './icons.tsx';
 
 export function errorText(err: unknown): string {
   if (isAppError(err)) return err.message;
@@ -46,12 +48,66 @@ export function useLoad<T>(load: () => Promise<T>, key: string) {
   return state;
 }
 
-export function Card({ title, children }: { title: string; children: ReactNode }) {
+export function Card({ title, children, actions, className }: { title: string; children: ReactNode; actions?: ReactNode; className?: string }) {
   return (
-    <section className="card" aria-label={title}>
-      <h2>{title}</h2>
+    <section className={className ? `card ${className}` : 'card'} aria-label={title}>
+      <div className="card-head">
+        <h2>{title}</h2>
+        {actions}
+      </div>
       {children}
     </section>
+  );
+}
+
+/** A screen inside the app: a title, an optional way back, and its content. */
+export function Page({ title, back, actions, children }: { title: string; back?: string; actions?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="page">
+      <header className="page-head">
+        {back ? (
+          <a className="icon-button" href={back} aria-label="Back">
+            <BackIcon />
+          </a>
+        ) : null}
+        <h1>{title}</h1>
+        <div className="page-actions">{actions}</div>
+      </header>
+      {children}
+    </div>
+  );
+}
+
+/** A round action with a caption, e.g. Deposit on the home screen. */
+export function ActionLink({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
+  return (
+    <a className="action" href={href}>
+      <span className="action-icon">{icon}</span>
+      <span>{label}</span>
+    </a>
+  );
+}
+
+/** The floating mark of the welcome and unlock screens. */
+export function Hero({ size = 220 }: { size?: number }) {
+  return (
+    <div className="hero" style={{ width: size, height: size }} aria-hidden="true">
+      <div className="hero-blob" />
+      <div className="hero-ring" />
+      <div className="hero-core">
+        <Logo size={Math.round(size * 0.42)} />
+      </div>
+    </div>
+  );
+}
+
+/** Soft background glows behind full-screen layouts. */
+export function Glows() {
+  return (
+    <div className="glows" aria-hidden="true">
+      <span className="glow one" />
+      <span className="glow two" />
+    </div>
   );
 }
 
@@ -72,9 +128,17 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export function Button({ busy, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean }) {
+  const round = rest.className?.split(' ').includes('round');
   return (
     <button type="button" {...rest} disabled={rest.disabled || busy} aria-busy={busy || undefined}>
-      {busy ? 'Working…' : children}
+      {busy ? (
+        <>
+          <span className="spinner" aria-hidden="true" />
+          {round ? null : 'Working…'}
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }
@@ -96,13 +160,14 @@ export function Copy({ text, label = 'Copy' }: { text: string; label?: string })
   return (
     <button
       type="button"
-      className="secondary"
+      className="secondary small"
       onClick={() => {
         void navigator.clipboard?.writeText(text).catch(() => undefined);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
     >
+      <CopyIcon />
       {copied ? 'Copied' : label}
     </button>
   );
@@ -116,14 +181,18 @@ export function Qr({ text, label }: { text: string; label: string }) {
   return src ? <img className="qr" src={src} alt={label} width={192} height={192} /> : null;
 }
 
+/** A dialog: a sheet that slides up on phones, a centred panel on wide screens. */
+/** Rendered at the end of the body, so an animated (transformed) ancestor cannot confine its backdrop. */
 export function Modal({ title, children }: { title: string; children: ReactNode }) {
-  return (
+  return createPortal(
     <div className="backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+        <span className="grabber" aria-hidden="true" />
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -182,6 +251,7 @@ export function RelayedSubmit({
   details,
   run,
   onDone,
+  className = 'primary wide',
 }: {
   label: string;
   token: TokenName;
@@ -191,6 +261,7 @@ export function RelayedSubmit({
   details: ReactNode;
   run: (relayer: RelayerPort) => Promise<unknown>;
   onDone?: () => void;
+  className?: string;
 }) {
   const [review, setReview] = useState<{ port: RelayerPort; fee: bigint } | null>(null);
   const quote = useAction(async () => {
@@ -204,22 +275,23 @@ export function RelayedSubmit({
   });
   return (
     <>
-      <Button disabled={disabled} busy={quote.busy} onClick={() => void quote.perform()}>
+      <Button className={className} disabled={disabled} busy={quote.busy} onClick={() => void quote.perform()}>
         {label}
       </Button>
       <ErrorNote error={quote.error} />
       {review ? (
         <Modal title={`Confirm: ${label}`}>
-          {details}
-          <p>
-            Relayer fee: <strong>{formatAmount(token, review.fee)}</strong> (paid privately from your notes)
+          <div className="review">{details}</div>
+          <p className="fee">
+            Relayer fee: <strong>{formatAmount(token, review.fee)}</strong>
+            <span className="muted"> · paid privately from your notes</span>
           </p>
           <ErrorNote error={submit.error} />
-          <div className="row">
-            <Button busy={submit.busy} onClick={() => void submit.perform(review.port)}>
+          <div className="stack">
+            <Button className="primary wide" busy={submit.busy} onClick={() => void submit.perform(review.port)}>
               Confirm
             </Button>
-            <Button className="secondary" disabled={submit.busy} onClick={() => setReview(null)}>
+            <Button className="ghost wide" disabled={submit.busy} onClick={() => setReview(null)}>
               Cancel
             </Button>
           </div>

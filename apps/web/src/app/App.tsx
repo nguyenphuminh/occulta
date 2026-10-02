@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Channels } from '../modules/channels/index.ts';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChannelsPage, type ChannelsView } from '../modules/channels/index.ts';
+import { Home } from '../modules/home/index.ts';
 import { Onboarding, PhraseNotice, Unlock } from '../modules/onboarding/index.ts';
-import { Shielded } from '../modules/pool/index.ts';
-import { PublicFunds } from '../modules/public/index.ts';
+import { Deposit, SendPrivately, Withdraw } from '../modules/pool/index.ts';
+import { Receive, SendPublic } from '../modules/public/index.ts';
 import { Settings } from '../modules/settings/index.ts';
-import { Header } from '../modules/wallet/index.ts';
+import { AccountBar } from '../modules/wallet/index.ts';
+import { ChannelsIcon, HomeIcon, Logo, SettingsIcon } from '../shared/icons.tsx';
 import { errorText } from '../shared/ui.tsx';
 import { AppContext, type AppContextValue } from './context.ts';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
@@ -16,12 +18,21 @@ import { startNode } from './settings.ts';
 /** How often the unlocked wallet syncs, moves channels forward and watches disputes. */
 const TICK_MS = Number(import.meta.env.VITE_OCCULTA_TICK_MS ?? 10_000);
 
-const PAGES = [
-  { path: '/', label: 'Public' },
-  { path: '/shielded', label: 'Shielded' },
-  { path: '/channels', label: 'Channels' },
-  { path: '/settings', label: 'Settings' },
-] as const;
+type Route =
+  | { section: 'home'; page: 'home' | 'deposit' | 'send' | 'withdraw' | 'receive' | 'send-public' }
+  | { section: 'channels'; view: ChannelsView }
+  | { section: 'settings' };
+
+function routeOf(path: string): Route {
+  if (path.startsWith('/invite/')) return { section: 'channels', view: { kind: 'open', invite: path.slice('/invite/'.length) } };
+  if (path === '/channels/new') return { section: 'channels', view: { kind: 'open', invite: '' } };
+  if (path === '/channels/invite') return { section: 'channels', view: { kind: 'invite' } };
+  if (path.startsWith('/channels/')) return { section: 'channels', view: { kind: 'channel', id: path.slice('/channels/'.length) } };
+  if (path === '/channels') return { section: 'channels', view: { kind: 'none' } };
+  if (path === '/settings') return { section: 'settings' };
+  const page = path.slice(1);
+  return { section: 'home', page: page === 'deposit' || page === 'send' || page === 'withdraw' || page === 'receive' || page === 'send-public' ? page : 'home' };
+}
 
 function useHashPath(): string {
   const [hash, setHash] = useState(location.hash);
@@ -32,6 +43,31 @@ function useHashPath(): string {
   }, []);
   return hash.replace(/^#/, '') || '/';
 }
+
+function pageOf(route: Route): ReactNode {
+  if (route.section === 'channels') return <ChannelsPage view={route.view} />;
+  if (route.section === 'settings') return <Settings />;
+  switch (route.page) {
+    case 'deposit':
+      return <Deposit />;
+    case 'send':
+      return <SendPrivately />;
+    case 'withdraw':
+      return <Withdraw />;
+    case 'receive':
+      return <Receive />;
+    case 'send-public':
+      return <SendPublic />;
+    default:
+      return <Home />;
+  }
+}
+
+const NAV = [
+  { section: 'home', href: '#/', label: 'Home', icon: <HomeIcon /> },
+  { section: 'channels', href: '#/channels', label: 'Channels', icon: <ChannelsIcon /> },
+  { section: 'settings', href: '#/settings', label: 'Settings', icon: <SettingsIcon /> },
+] as const;
 
 export function App() {
   const prompts = useMemo(() => new Prompts(), []);
@@ -79,37 +115,45 @@ export function App() {
 
   const context: AppContextValue | null = useMemo(() => (phase === 'ready' ? { occulta, prompts, version, refresh, lock } : null), [phase, occulta, prompts, version, refresh, lock]);
 
-  if (phase === 'loading') return <main className="center">Loading…</main>;
-  if (phase === 'onboarding') return <main className="center">{<Onboarding occulta={occulta} onReady={onReady} />}</main>;
-  if (phase === 'locked' || !context) return <main className="center">{<Unlock occulta={occulta} onReady={onReady} />}</main>;
+  if (phase === 'loading') return <div className="loading" aria-busy="true" />;
+  if (phase === 'onboarding') return <Onboarding occulta={occulta} onReady={onReady} />;
+  if (phase === 'locked' || !context) return <Unlock occulta={occulta} onReady={onReady} />;
 
-  const invite = path.startsWith('/invite/') ? path.slice('/invite/'.length) : '';
-  const page = invite ? '/channels' : path;
+  const route = routeOf(path);
   return (
     <AppContext.Provider value={context}>
-      <Header />
-      <nav className="tabs">
-        {PAGES.map((p) => (
-          <a key={p.path} href={`#${p.path}`} aria-current={page === p.path ? 'page' : undefined}>
-            {p.label}
+      <div className={`shell section-${route.section}`}>
+        <aside className="sidebar">
+          <a className="brand" href="#/">
+            <Logo size={34} />
+            <span>Occulta</span>
           </a>
-        ))}
-      </nav>
-      <main>
-        {problems.length > 0 ? (
-          <ul className="problems" aria-label="Background problems">
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
+          <nav className="nav" aria-label="Main">
+            {NAV.map((n) => (
+              <a key={n.section} href={n.href} aria-current={route.section === n.section ? 'page' : undefined}>
+                {n.icon}
+                <span>{n.label}</span>
+              </a>
             ))}
-          </ul>
-        ) : null}
-        <ErrorBoundary key={page} resetKey={version}>
-          {page === '/shielded' ? <Shielded /> : page === '/channels' ? <Channels invite={invite} /> : page === '/settings' ? <Settings /> : <PublicFunds />}
-        </ErrorBoundary>
-      </main>
-      <footer>
-        <PhraseNotice />
-      </footer>
+          </nav>
+          <AccountBar />
+        </aside>
+        <main className="content">
+          {problems.length > 0 ? (
+            <ul className="problems" aria-label="Background problems">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          ) : null}
+          <ErrorBoundary key={route.section} resetKey={version}>
+            {pageOf(route)}
+          </ErrorBoundary>
+          <footer className="footer">
+            <PhraseNotice />
+          </footer>
+        </main>
+      </div>
       {prompt ? <PromptDialog prompt={prompt} onAnswer={(answer) => prompts.answer(answer)} /> : null}
     </AppContext.Provider>
   );

@@ -10,9 +10,9 @@ export function PromptDialog({ prompt, onAnswer }: { prompt: Prompt; onAnswer: (
         <p>
           Pay <strong>{formatAmount(tokenName(prompt.token), prompt.amount)}</strong> in channel {prompt.channelId.slice(0, 8)}?
         </p>
-        <div className="row">
-          <Button onClick={() => onAnswer(true)}>Confirm payment</Button>
-          <Button className="secondary" onClick={() => onAnswer(false)}>
+        <div className="stack">
+          <Button className="primary wide" onClick={() => onAnswer(true)}>Confirm payment</Button>
+          <Button className="ghost wide" onClick={() => onAnswer(false)}>
             Cancel
           </Button>
         </div>
@@ -30,9 +30,9 @@ export function PromptDialog({ prompt, onAnswer }: { prompt: Prompt; onAnswer: (
       <p>
         Dispute window: {Number(request.window) / 86_400} days · closing fee {formatAmount(token, request.closingFee)} (paid by them)
       </p>
-      <div className="row">
-        <Button onClick={() => onAnswer(true)}>Accept and fund</Button>
-        <Button className="secondary" onClick={() => onAnswer(false)}>
+      <div className="stack">
+        <Button className="primary wide" onClick={() => onAnswer(true)}>Accept and fund</Button>
+        <Button className="ghost wide" onClick={() => onAnswer(false)}>
           Decline
         </Button>
       </div>
