@@ -57,6 +57,15 @@ describe('Occulta facade', () => {
     expect(() => none.relayer()).toThrow(/No transaction relayer/);
   });
 
+  it('applies changed settings from the next start', async () => {
+    const occulta = await node();
+    await occulta.start();
+    expect(() => occulta.relayer()).toThrow(/No transaction relayer/);
+    occulta.configure({ relayers: [fixedRelayer(1n)] });
+    await occulta.start();
+    expect((await occulta.relayer().info()).fees[zeroAddress]).toBe('1');
+  });
+
   it('locking stops the services and forgets derived keys', async () => {
     const occulta = await node();
     await occulta.start();

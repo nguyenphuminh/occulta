@@ -56,7 +56,7 @@ interface Session {
 export class Occulta {
   readonly wallet: WalletService;
   readonly keys: KeyRing;
-  private readonly options: OccultaOptions;
+  private options: OccultaOptions;
   private readonly prover: Prover;
   private session: Session | null = null;
 
@@ -65,6 +65,11 @@ export class Occulta {
     this.wallet = new WalletService(new WalletRepository(options.store), options.kdf);
     this.keys = new KeyRing(this.wallet);
     this.prover = new Prover(options.artifacts);
+  }
+
+  /** Changes settings a user can edit (e.g. adding a relay); they apply from the next start(). */
+  configure(changes: Partial<Pick<OccultaOptions, 'networks' | 'libp2pRelays' | 'relayers' | 'maxFee' | 'disputeWindow'>>): void {
+    this.options = { ...this.options, ...changes };
   }
 
   networks(): readonly NetworkConfig[] {
