@@ -266,8 +266,13 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
       await expect(waiting).toContainText('Waiting for');
       await expect(request).toContainText('They fund 0.001 ETH and ask you to fund 0.0005 ETH');
       if (answer === 'accept') {
-        await request.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
-        await request.getByRole('button', { name: 'Accept and fund' }).click();
+        // Bob closes the request and answers it from his channel list.
+        await request.getByRole('button', { name: 'Close' }).click();
+        await openChannels(bobPage);
+        await bobPage.getByTestId('channel-item').first().click();
+        const incoming = bobPage.getByTestId('channel-request');
+        await incoming.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
+        await incoming.getByRole('button', { name: 'Accept and fund' }).click();
         await expect(a).toHaveURL(/#\/channels\/[0-9a-f]{32}$/, { timeout: 300_000 }); // on to the channel
       } else {
         if (answer === 'decline') {

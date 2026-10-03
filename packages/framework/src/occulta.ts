@@ -33,6 +33,7 @@ export interface OccultaOptions {
   /** Dispute window of new channels in seconds, between 3 and 7 days (default 7 days). */
   disputeWindow?: bigint;
   approveOpen?: ChannelDeps['approveOpen'];
+  onJoined?: ChannelDeps['onJoined'];
   /** Without it, outgoing channel payments are signed automatically. */
   confirmPayment?: ChannelDeps['confirmPayment'];
   /** Only lowered by tests. */
@@ -114,6 +115,7 @@ export class Occulta {
         p2p,
         repository: new ChannelRepository(wallet, network.id),
         approveOpen: options.approveOpen,
+        onJoined: options.onJoined,
         confirmPayment: options.confirmPayment,
         window: options.disputeWindow,
       });

@@ -65,14 +65,17 @@ export function App() {
   const [phase, setPhase] = useState<'loading' | 'onboarding' | 'locked' | 'ready'>('loading');
   const [version, setVersion] = useState(0);
   const [problems, setProblems] = useState<string[]>([]);
-  const [prompt, setPrompt] = useState(prompts.current());
+  const [asked, setAsked] = useState(prompts.current());
   const path = useHashPath();
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     void occulta.wallet.exists().then((exists) => setPhase(exists ? 'locked' : 'onboarding'));
-    return prompts.subscribe(() => setPrompt(prompts.current()));
-  }, [occulta, prompts]);
+    return prompts.subscribe(() => {
+      setAsked(prompts.current());
+      refresh(); // channel requests also show in the channel list
+    });
+  }, [occulta, prompts, refresh]);
 
   useEffect(() => pendingOpens.subscribe(refresh), [pendingOpens, refresh]);
 
@@ -151,7 +154,7 @@ export function App() {
           </ErrorBoundary>
         </main>
       </div>
-      {prompt ? <PromptDialog prompt={prompt} onAnswer={(answer) => prompts.answer(answer)} /> : null}
+      {asked ? <PromptDialog asked={asked} /> : null}
     </AppContext.Provider>
   );
 }

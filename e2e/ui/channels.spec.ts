@@ -119,6 +119,16 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
     await expect(open).toBeHidden();
     const request = bob.getByRole('dialog', { name: 'Channel request' });
     await expect(request).toContainText('They fund 0.03 ETH and ask you to fund 0.02 ETH');
+    await expect(request).toContainText(/\d+ s left to answer/);
+    // Bob puts the request aside and answers it from his channel list.
+    await request.getByRole('button', { name: 'Close' }).click();
+    await expect(request).toBeHidden();
+    await openChannels(bob);
+    await expect(bob.getByTestId('channel-item').first()).toContainText('Request');
+    await bob.getByTestId('channel-item').first().click();
+    const incoming = bob.getByTestId('channel-request');
+    await expect(incoming).toContainText('They fund 0.03 ETH and ask you to fund 0.02 ETH');
+    await expect(incoming).toContainText(/\d+ s left to answer/);
     const waiting = alice.getByTestId('pending-open');
     await expect(waiting).toContainText('Waiting for Bob to accept');
     await expect(waiting.getByRole('heading', { level: 2 })).toHaveText('Bob');
@@ -130,7 +140,9 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
       await openAction(alice, 'Receive');
       await popup(alice, 'Receive').getByRole('button', { name: 'Close' }).click();
       await expect(alice.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
-      await request.getByRole('button', { name: 'Decline' }).click();
+      await incoming.getByRole('button', { name: 'Decline' }).click();
+      await expect(bob.getByText('This channel request ended: it was declined or not answered in time.')).toBeVisible();
+      await expect(bob.getByTestId('channel-item')).toHaveCount(0);
       await openChannels(alice);
       const declined = alice.getByTestId('channel-item').first();
       await expect(declined).toContainText('Declined');
@@ -141,8 +153,12 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
       await expect(alice.getByTestId('channel-item')).toHaveCount(0);
       await expect(alice).toHaveURL(/#\/channels$/);
     } else {
-      await request.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
-      await request.getByRole('button', { name: 'Accept and fund' }).click();
+      await incoming.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
+      await incoming.getByRole('button', { name: 'Accept and fund' }).click();
+      // Bob's request becomes the channel in place, listed once.
+      await expect(channelView(bob).getByRole('heading', { level: 2 })).toHaveText('Alice');
+      await expect(incoming).toBeHidden();
+      await expect(bob.getByTestId('channel-item')).toHaveCount(1);
       // Alice was looking at the request: she follows it to the channel, listed once.
       await expect(alice).toHaveURL(/#\/channels\/[0-9a-f]{32}$/);
       await expect(waiting).toBeHidden();
@@ -232,11 +248,16 @@ test('a channel request nobody answers counts as declined', async ({ browser }) 
   await confirmRelayed(alice, 'Open channel');
   const request = bob.getByRole('dialog', { name: 'Channel request' });
   await expect(request).toBeVisible();
+  // Bob closes the request and leaves it: after about a minute it counts as declined.
+  await request.getByRole('button', { name: 'Close' }).click();
+  await openChannels(bob);
+  await bob.getByTestId('channel-item').first().click();
+  await expect(bob.getByTestId('channel-request')).toContainText(/\d+ s left to answer/);
   const waiting = alice.getByTestId('pending-open');
   await expect(waiting).toContainText('Waiting for');
   await expect(waiting).toContainText('declined, or did not answer in time', { timeout: 75_000 });
   await expect(alice.getByTestId('channel-item').first()).toContainText('Declined');
-  await expect(request).toBeHidden();
+  await expect(bob.getByText('This channel request ended: it was declined or not answered in time.')).toBeVisible();
   await expect(bob.getByTestId('channel-item')).toHaveCount(0);
   // It stays until dismissed.
   await openChannels(alice);

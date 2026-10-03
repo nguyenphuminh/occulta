@@ -1350,6 +1350,13 @@ button.icon-button {
   flex: 1;
 }
 
+.request-answer {
+  display: grid;
+  gap: 10px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--line);
+}
+
 .composer-field input {
   min-height: 48px;
   border-radius: 24px;

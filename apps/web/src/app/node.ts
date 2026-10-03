@@ -23,6 +23,8 @@ export function createOcculta(prompts: Prompts): Occulta {
     networks: [...BUILT_IN_NETWORKS, ...devNetworks()],
     // BRD 2.2.7: a channel that needs none of the user's money opens without asking.
     approveOpen: (request) => (request.peerAmount === 0n ? Promise.resolve(true) : prompts.ask({ kind: 'approve-open', request }, APPROVAL_TIMEOUT_MS)),
+    // The channel of an accepted request takes its place in the channel list (BRD 2.2.14.9).
+    onJoined: (channelId) => prompts.joined(channelId),
     // BRD 2.2.8: no outgoing payment is signed without the user's confirmation in the wallet's dialog.
     confirmPayment: (payment) => prompts.ask({ kind: 'confirm-payment', ...payment }),
   });

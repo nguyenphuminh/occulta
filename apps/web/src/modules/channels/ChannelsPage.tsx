@@ -7,6 +7,7 @@ import { Conversation, PendingConversation } from './Conversation.tsx';
 import { nicknames } from './nicknames.ts';
 import { InviteDialog, OpenDialog } from './Panels.tsx';
 import type { PendingOpen } from './pendingOpens.ts';
+import { RequestConversation } from './requests.tsx';
 import { PENDING_TEXT, STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
@@ -66,7 +67,7 @@ function ChannelItem({ id, on, peerId, names, amount, line, status, statusText }
  * open one, both the full height of the screen; on phones the list, then the channel on its own.
  */
 export function ChannelsPage({ view }: { view: ChannelsView }) {
-  const { occulta, pendingOpens, version } = useApp();
+  const { occulta, prompts, pendingOpens, version } = useApp();
   let channels: ChannelService;
   try {
     channels = occulta.channels;
@@ -82,9 +83,11 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
   }
   const names = nicknames(occulta);
   const list = [...channels.list()].reverse();
-  // Opens still waiting for the other side, newest first, above the channels (BRD 2.2.14.8).
+  // Channel requests to answer, then opens waiting for the other side, newest first, above the channels (BRD 2.2.14.8–9).
+  const requests = [...prompts.requests()].reverse();
   const pending = [...pendingOpens.list(occulta.wallet.activeAccount().id, occulta.network().id)].reverse();
   const selected = view.kind === 'channel' ? list.find((r) => r.id === view.id) : undefined;
+  const selectedRequest = view.kind === 'channel' ? requests.find((r) => r.prompt.request.channelId === view.id) : undefined;
   const selectedPending = view.kind === 'channel' ? pending.find((p) => p.id === view.id) : undefined;
   const hasFunds = [...occulta.pool.balances().values()].some((v) => v > 0n);
   return (
@@ -101,7 +104,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
             </a>
           </div>
         </header>
-        {list.length === 0 && pending.length === 0 ? (
+        {list.length === 0 && pending.length === 0 && requests.length === 0 ? (
           <div className="empty">
             <ChannelsIcon />
             <p>No channels yet.</p>
@@ -114,6 +117,19 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
           </div>
         ) : (
           <ul className="channel-items">
+            {requests.map((r) => (
+              <ChannelItem
+                key={r.id}
+                id={r.prompt.request.channelId}
+                on={selectedRequest?.id === r.id}
+                peerId={r.prompt.request.peerId}
+                names={names}
+                amount={formatAmount(tokenName(r.prompt.request.token), r.prompt.request.peerAmount)}
+                line={r.joining ? 'Joining the channel…' : 'Wants to open a channel with you'}
+                status="pending"
+                statusText={r.joining ? 'Joining' : 'Request'}
+              />
+            ))}
             {pending.map((p) => (
               <ChannelItem
                 key={p.id}
@@ -146,6 +162,8 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
       <div className="channel-detail">
         {selected ? (
           <Conversation key={selected.id} record={selected} channels={channels} names={names} />
+        ) : selectedRequest ? (
+          <RequestConversation key={selectedRequest.id} asked={selectedRequest} names={names} />
         ) : selectedPending ? (
           <PendingConversation key={selectedPending.id} open={selectedPending} names={names} />
         ) : (
@@ -154,7 +172,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
               <ChannelsIcon />
             </span>
             {view.kind === 'channel' ? (
-              <p>This channel is not in this account on this network.</p>
+              <p>{prompts.hasEnded(view.id) ? 'This channel request ended: it was declined or not answered in time.' : 'This channel is not in this account on this network.'}</p>
             ) : (
               <>
                 <h2>Your channels</h2>

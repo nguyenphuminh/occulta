@@ -89,6 +89,8 @@ export interface ChannelDeps {
    * (it shared its invite for that) and channels that need its money are refused.
    */
   approveOpen?: (request: OpenRequest) => Promise<boolean>;
+  /** Called once this side has joined a channel the other side proposed and saved it, before funding. */
+  onJoined?: (channelId: string) => void;
   /** Asked before every outgoing payment (BRD 2.2.13); without it payments are signed automatically. */
   confirmPayment?: (payment: { channelId: string; token: bigint; amount: bigint }) => Promise<boolean>;
   /** Dispute window of new channels in seconds (default: the longest the contract accepts, 7 days). */
@@ -486,6 +488,7 @@ export class ChannelService {
     record.state0.sigB = sigB0;
     record.latest.sigB = sigB0;
     await repository.save(record, account);
+    this.deps.onJoined?.(m.channelId);
     return { shareB, pkB, tagB, encPubB: record.encPubB, contribB, sigB0 };
   }
 

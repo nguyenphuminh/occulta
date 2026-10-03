@@ -80,7 +80,7 @@ export async function newChannelNode(
   user: User,
   chain: ChainAdapter,
   relayAddr: string,
-  options: Pick<ChannelDeps, 'approveOpen' | 'confirmPayment'> = {},
+  options: Pick<ChannelDeps, 'approveOpen' | 'onJoined' | 'confirmPayment'> = {},
 ): Promise<ChannelNode> {
   const p2p = new P2PService(await createPeerNode({ relays: [relayAddr] }));
   const { wallet, keys, pool } = user;
