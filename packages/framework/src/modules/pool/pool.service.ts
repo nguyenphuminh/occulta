@@ -60,10 +60,10 @@ export class PoolService {
   async refreshChain(): Promise<void> {
     const { chain } = this.deps;
     const { deployBlock } = chain.contracts();
-    const latest = await chain.latestBlock();
     const from = this.scannedTo < deployBlock ? deployBlock : this.scannedTo + 1n;
+    // One endpoint answers for the whole range, up to the latest block it has.
+    const { toBlock: latest, commitments, nullifiers } = await chain.poolEvents(from);
     if (from > latest) return;
-    const [commitments, nullifiers] = await Promise.all([chain.commitments(from, latest), chain.nullifiers(from, latest)]);
     for (const event of commitments) {
       if (event.leafIndex !== this.tree.size) {
         // A gap means the mirror is out of step (e.g. an RPC hiccup): rebuild it from scratch.

@@ -56,6 +56,11 @@ node apps/desktop/src/main.ts start --relayer --relayer-account <unused account>
   --relayer-fee-eth 0.0001 --relayer-fee-usdg 0.01 --libp2p-relay   # also serve others
 ```
 
+The chain is read through RPC endpoints: Arbitrum Sepolia comes with Arbitrum's public endpoint, then
+PublicNode's and Tenderly's. Users add their own in the website's network settings, or with
+`--chain-rpcs <url,url>` on the desktop client; theirs are tried first, and `--no-chain-rpc-fallback`
+(or the switch in the settings) keeps the wallet from ever using the public ones.
+
 A custom chain (e.g. the dev node) is passed with `--network-file <json> --network <id>`, in the
 format of the built-in configurations in `packages/framework/src/modules/chain/chain.config.ts`.
 The website gets them through `VITE_OCCULTA_DEV_NETWORK` (the same JSON, or a list of them) when it is started with

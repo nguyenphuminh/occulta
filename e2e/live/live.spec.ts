@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { mnemonicToAccount } from 'viem/accounts';
+import { chainIdAt, defaultRpcUrls } from '../../packages/framework/src/modules/chain/index.ts';
 import { REPO } from '../../scripts/lib/devnode.ts';
 import {
   PASSWORD,
@@ -60,6 +61,8 @@ test('the website, its proving files and the relayer answer', async ({ request }
   expect(info.ok()).toBe(true);
   expect(await info.json()).toMatchObject({ chainId: network.chainId, shieldedAddress: expect.stringMatching(/^occ/) });
   expect(RELAY).toMatch(/^\/dns4\/relay\.occulta\.space\/tcp\/443\/wss\/p2p\/12D3/);
+  // Every built-in RPC endpoint still answers for Arbitrum Sepolia.
+  for (const url of defaultRpcUrls(network)) expect(await chainIdAt(url)).toBe(network.chainId);
 });
 
 test('wallet basics: a new wallet opens on Channels with the live relays, locks, unlocks and imports on another browser', async ({ browser }) => {

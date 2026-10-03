@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { chainIdAt, defaultRpcUrls } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { readSettings, startNode, writeSettings, type WebSettings } from '../../app/settings.ts';
 import { BackIcon, ChannelsIcon, KeyIcon, ShieldIcon } from '../../shared/icons.tsx';
@@ -87,7 +88,77 @@ function Backup() {
   );
 }
 
-/** BRD 2.2.11, 2.2.13: the network's relayers and relays, with the user's own added first. */
+/**
+ * BRD 2.2.14.5: the RPC endpoints the wallet reads the chain through, the user's own first, in the
+ * order they were added. An endpoint is added only if it answers for this network.
+ */
+function RpcEndpoints({ settings, update }: { settings: WebSettings; update: (next: WebSettings) => Promise<void> }) {
+  const { occulta } = useApp();
+  const network = occulta.network();
+  const [entry, setEntry] = useState('');
+  const own = settings.rpcUrls;
+  const add = useAction(async () => {
+    if (!/^https?:\/\/\S+$/.test(entry)) throw new Error('Enter the endpoint’s http(s) address');
+    const chainId = await chainIdAt(entry);
+    if (chainId !== network.chainId) throw new Error(`This endpoint serves chain ${chainId}, not ${network.name} (${network.chainId})`);
+    await update({ ...settings, rpcUrls: [...own, entry] });
+    setEntry('');
+  });
+  const change = useAction(update);
+  // Shown at once; saving it restarts the node, which takes a moment.
+  const [fallback, setFallback] = useState(settings.rpcFallback);
+  const defaultsUsed = own.length === 0 || fallback;
+  return (
+    <Card title={`RPC endpoints on ${network.name}`}>
+      <p className="muted small">The wallet reads the chain through the first of these that answers, in this order.</p>
+      <ul className="rows">
+        {own.map((url) => (
+          <li key={url} className="row-item">
+            <code className="mono break">{url}</code>
+            <Button className="ghost small" onClick={() => void change.perform({ ...settings, rpcUrls: own.filter((o) => o !== url) })}>
+              Remove
+            </Button>
+          </li>
+        ))}
+        {defaultRpcUrls(network).map((url) => (
+          <li key={`default-${url}`} className={defaultsUsed ? 'row-item' : 'row-item muted'}>
+            <code className="mono break">{url}</code>
+            <span className="pill">{defaultsUsed ? 'Network default' : 'Not used'}</span>
+          </li>
+        ))}
+      </ul>
+      {own.length > 0 ? (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={fallback}
+            onChange={(e) => {
+              setFallback(e.target.checked);
+              void change.perform({ ...settings, rpcFallback: e.target.checked });
+            }}
+          />{' '}
+          Use the network’s endpoints
+          when mine do not answer
+        </label>
+      ) : null}
+      <div className="inline-form">
+        <Field label="Add your own">
+          <input value={entry} placeholder="https://rpc.example" spellCheck={false} onChange={(e) => setEntry(e.target.value.trim())} />
+        </Field>
+        <Button className="secondary" busy={add.busy} disabled={!entry || own.includes(entry)} onClick={() => void add.perform()}>
+          Add
+        </Button>
+      </div>
+      <ErrorNote error={add.error ?? change.error} />
+      <Notice>
+        Your RPC provider sees your IP address and the public addresses you check. Add only endpoints you trust: a dishonest one could hide events from your wallet, such as a dispute it has
+        to answer.
+      </Notice>
+    </Card>
+  );
+}
+
+/** BRD 2.2.11, 2.2.13, 2.2.14.5: the network's RPC endpoints, relayers and relays, with the user's own first. */
 function Network() {
   const { occulta, refresh } = useApp();
   const network = occulta.network();
@@ -98,6 +169,7 @@ function Network() {
   };
   return (
     <>
+      <RpcEndpoints settings={settings} update={update} />
       <EditableList
         title={`Transaction relayers on ${network.name}`}
         fixed={network.relayers}
@@ -119,7 +191,7 @@ function Network() {
 const CATEGORIES: { id: SettingsCategory; title: string; text: (network: string) => string; icon: ReactNode }[] = [
   { id: 'accounts', title: 'Accounts', text: () => 'Switch, add or import accounts', icon: <KeyIcon /> },
   { id: 'backup', title: 'Backup', text: () => 'Export everything, or restore a file', icon: <ShieldIcon /> },
-  { id: 'network', title: 'Network', text: (network) => `Relayers and relays on ${network}`, icon: <ChannelsIcon /> },
+  { id: 'network', title: 'Network', text: (network) => `RPC endpoints, relayers and relays on ${network}`, icon: <ChannelsIcon /> },
 ];
 
 /**

@@ -88,6 +88,18 @@ describe('Occulta facade', () => {
     expect(storeOf().load().syncedBlock).toBe(42n);
   });
 
+  it('reads the chain through the user’s own RPC endpoints first, then the network’s unless that is turned off', async () => {
+    const occulta = await node();
+    const defaults = ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia-rpc.publicnode.com', 'https://arbitrum-sepolia.gateway.tenderly.co'];
+    expect(occulta.rpcUrls()).toEqual(defaults);
+    occulta.configure({ rpcUrls: ['https://mine.example', defaults[1] as string] });
+    expect(occulta.rpcUrls()).toEqual(['https://mine.example', defaults[1], defaults[0], defaults[2]]);
+    occulta.configure({ rpcFallback: false });
+    expect(occulta.rpcUrls()).toEqual(['https://mine.example', defaults[1]]);
+    occulta.configure({ rpcUrls: [] });
+    expect(occulta.rpcUrls()).toEqual(defaults); // with none of their own, the network's are used
+  });
+
   it('locking stops the services and forgets derived keys', async () => {
     const occulta = await node();
     await occulta.start();

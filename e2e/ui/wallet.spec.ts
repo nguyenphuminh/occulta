@@ -1,9 +1,35 @@
 // BRD 2.2.14.1–2.2.14.6 in the browser: create, import, accounts, password and lock, networks,
-// reset, export and restore.
+// the user's own RPC endpoints, reset, export and restore.
 import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { expect, test, type Page } from '@playwright/test';
 import { mnemonicToAccount, privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, openAction, openChannels, openSettings, openWallet, phraseWords, popup, setPassword, unlock, useDevNetwork } from './helpers.ts';
+
+/** A JSON-RPC endpoint for the browser in front of the dev node: it counts requests, can go down, or claim another chain. */
+async function rpcProxy(target: string, chainId?: string) {
+  const proxy = { url: '', requests: 0, down: false };
+  const server = createServer((req, res) => {
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('access-control-allow-headers', 'content-type');
+    if (req.method === 'OPTIONS') return void res.writeHead(204).end();
+    let body = '';
+    req.on('data', (c: Buffer) => (body += c.toString()));
+    req.on('end', () => {
+      proxy.requests++;
+      if (proxy.down) return void res.writeHead(503).end('down');
+      const request = JSON.parse(body) as { id: number; method: string };
+      if (chainId && request.method === 'eth_chainId') return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: chainId }));
+      void fetch(target, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+        .then((r) => r.text())
+        .then((text) => res.writeHead(200, { 'content-type': 'application/json' }).end(text));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  proxy.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/rpc`;
+  return { proxy, close: () => server.close() };
+}
 
 /** Everything this website stored in IndexedDB, as text. */
 async function storedText(page: Page): Promise<string> {
@@ -242,4 +268,65 @@ test('the app opens on Channels; the phrase warning is one banner that stays clo
   await page.getByRole('button', { name: 'Forgot the password?' }).click();
   await page.getByLabel('I understand that imported keys and channel data will be lost', { exact: true }).check();
   await expect(page.getByText(notice)).toBeVisible();
+});
+
+test('own RPC endpoints are checked before they are kept, tried first, and with the fallback off nothing else is asked', async ({ page }) => {
+  const network = JSON.parse(process.env.OCCULTA_UI_NETWORK as string) as { name: string; rpcUrl: string; chainId: number };
+  const own = await rpcProxy(network.rpcUrl);
+  const otherChain = await rpcProxy(network.rpcUrl, '0x1');
+  await createWallet(page);
+  await useDevNetwork(page);
+  await fundPublicly(page, '1');
+  await openAction(page, 'Deposit');
+  await popup(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
+  await popup(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+
+  await openSettings(page, 'Network');
+  const rpc = card(page, `RPC endpoints on ${network.name}`);
+  const add = async (url: string) => {
+    await rpc.getByLabel('Add your own', { exact: true }).fill(url);
+    await rpc.getByRole('button', { name: 'Add' }).click();
+  };
+  await add('http://127.0.0.1:9/rpc');
+  await expect(rpc.getByRole('alert')).toHaveText('This RPC endpoint does not answer');
+  await add(otherChain.proxy.url);
+  await expect(rpc.getByRole('alert')).toHaveText(`This endpoint serves chain 1, not ${network.name} (${network.chainId})`);
+  await add(own.proxy.url);
+  await expect(rpc.getByRole('listitem').filter({ hasText: own.proxy.url }).getByRole('button', { name: 'Remove' })).toBeVisible();
+  const fallback = rpc.getByLabel('Use the network’s endpoints when mine do not answer');
+  await expect(fallback).toBeChecked();
+  await fallback.uncheck();
+  await expect(rpc.getByRole('listitem').filter({ hasText: network.rpcUrl })).toContainText('Not used');
+
+  // From now on only the user's endpoint is asked, also when it stops answering.
+  await expect.poll(() => own.proxy.requests).toBeGreaterThan(0);
+  await page.waitForTimeout(2_000); // what the previous node had under way is done
+  const asked: string[] = [];
+  page.on('request', (r) => asked.push(r.url()));
+  await openWallet(page);
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+  own.proxy.down = true;
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: `No RPC endpoint of ${network.name} is answering` }).first()).toBeVisible(); // also for the public balance
+  expect(asked.filter((url) => url.startsWith(network.rpcUrl))).toEqual([]);
+
+  // With the fallback back on, the network's endpoint takes over.
+  await openSettings(page, 'Network');
+  await fallback.check();
+  await openWallet(page);
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'No RPC endpoint' })).toHaveCount(0);
+  await expect.poll(() => asked.some((url) => url.startsWith(network.rpcUrl))).toBe(true);
+
+  // Kept in the wallet, across a lock; and removable.
+  await page.getByRole('button', { name: 'Lock' }).click();
+  await unlock(page);
+  await openSettings(page, 'Network');
+  await rpc.getByRole('listitem').filter({ hasText: own.proxy.url }).getByRole('button', { name: 'Remove' }).click();
+  await expect(rpc.getByText(own.proxy.url)).toHaveCount(0);
+  await expect(fallback).toHaveCount(0); // only shown while the user has endpoints of their own
+  own.close();
+  otherChain.close();
 });

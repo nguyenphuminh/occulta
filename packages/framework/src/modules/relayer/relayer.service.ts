@@ -70,16 +70,18 @@ export class RelayerService {
           ? { address: disputes, abi: disputesAbi, functionName: 'submitState', args: [proof, signals] }
           : { address: disputes, abi: disputesAbi, functionName: request.kind, args: [proof, signals, request.ciphertexts] };
     const account = this.options.account;
+    // One endpoint for the whole submission: sent again through another, it could go through twice.
+    const { client, rpcUrl } = this.chain;
     try {
-      await this.chain.client.simulateContract({ ...call, account } as never);
+      await client.simulateContract({ ...call, account } as never);
     } catch (err) {
       const reverted = err instanceof BaseError ? err.walk((e) => e instanceof ContractFunctionRevertedError) : null;
       const reason = reverted instanceof ContractFunctionRevertedError ? (reverted.data?.errorName ?? reverted.shortMessage) : 'unknown reason';
       throw new AppError(422, 'WOULD_REVERT', `The transaction would fail on-chain: ${reason}`);
     }
-    const wallet = createWalletClient({ account, chain: this.chain.chain, transport: http(this.chain.network.rpcUrl) });
+    const wallet = createWalletClient({ account, chain: this.chain.chain, transport: http(rpcUrl) });
     const txHash = await wallet.writeContract({ ...call, account, chain: this.chain.chain } as never);
-    const receipt = await this.chain.client.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await client.waitForTransactionReceipt({ hash: txHash });
     if (receipt.status !== 'success') throw new AppError(502, 'TRANSACTION_FAILED', `Transaction ${txHash} failed`);
     return { txHash };
   }

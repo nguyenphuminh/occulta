@@ -8,6 +8,8 @@ export const NetworkConfigSchema = z.object({
   name: z.string(),
   chainId: z.number().int().positive(),
   rpcUrl: z.string().url(),
+  /** More public endpoints, tried after `rpcUrl` when it does not answer. */
+  backupRpcUrls: z.array(z.string().url()).optional(),
   explorerUrl: z.string().url().optional(),
   usdg: address,
   /** Absent until Occulta is deployed on this chain. */
@@ -33,7 +35,10 @@ export const BUILT_IN_NETWORKS: readonly NetworkConfig[] = [
     id: 'arbitrum-sepolia',
     name: 'Arbitrum Sepolia',
     chainId: 421614,
+    // Arbitrum's own public endpoint (docs.arbitrum.io), then two other public ones, checked on
+    // 2026-10-03 to serve the pool's whole event history and to answer browsers.
     rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    backupRpcUrls: ['https://arbitrum-sepolia-rpc.publicnode.com', 'https://arbitrum-sepolia.gateway.tenderly.co'],
     explorerUrl: 'https://sepolia.arbiscan.io',
     usdg: '0xFFC95faa3d63Cde504a05B567C600B78C0b41892',
     // Deployed 2026-10-02 (production build: 3–7 day dispute window).

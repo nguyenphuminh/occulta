@@ -30,6 +30,9 @@ describe('desktop configuration', () => {
       '/ip4/1.2.3.4/tcp/1/ws/p2p/x, /dns4/r/tcp/2/wss/p2p/y',
       '--relayers',
       'https://relay.example',
+      '--chain-rpcs',
+      'https://rpc.one.example, https://rpc.two.example',
+      '--no-chain-rpc-fallback',
       '--no-shell',
       '--tick',
       '5',
@@ -39,6 +42,8 @@ describe('desktop configuration', () => {
     expect(c.libp2pRelays).toEqual(['/ip4/1.2.3.4/tcp/1/ws/p2p/x', '/dns4/r/tcp/2/wss/p2p/y']);
     expect(c.libp2pRelay).toMatchObject({ enabled: true, announce: ['/dns4/relay.example/tcp/443/wss'] });
     expect(c.relayers).toEqual(['https://relay.example']);
+    expect(c.chainRpcs).toEqual(['https://rpc.one.example', 'https://rpc.two.example']);
+    expect(c.chainRpcFallback).toBe(false);
     expect(c.shell).toBe(false);
     expect(c.tickSeconds).toBe(5);
   });

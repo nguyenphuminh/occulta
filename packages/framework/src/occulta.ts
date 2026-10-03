@@ -2,7 +2,7 @@ import type { Libp2p } from '@libp2p/interface';
 import { concat, hexToBytes, keccak256, stringToHex } from 'viem';
 import { AppError } from './shared/errors/AppError.ts';
 import { Prover, type ArtifactLoader, type ProverPort } from './shared/integrations/prover.ts';
-import { BUILT_IN_NETWORKS, ChainAdapter, tokenAddress, type NetworkConfig } from './modules/chain/index.ts';
+import { BUILT_IN_NETWORKS, ChainAdapter, defaultRpcUrls, tokenAddress, type NetworkConfig } from './modules/chain/index.ts';
 import { ChannelRepository, ChannelService, type ChannelDeps, type TickProblem } from './modules/channel/index.ts';
 import { DisputeService } from './modules/dispute/index.ts';
 import { KeyRing } from './modules/keys/index.ts';
@@ -26,6 +26,10 @@ export interface OccultaOptions {
   networks?: readonly NetworkConfig[];
   /** libp2p relays to use instead of the network's own list. */
   libp2pRelays?: string[];
+  /** The user's own RPC endpoints, tried first and in order (BRD 2.2.13); default: the network's own. */
+  rpcUrls?: string[];
+  /** When the user's endpoints all fail, use the network's own too (default true). */
+  rpcFallback?: boolean;
   /** Transaction relayers to use instead of the network's own list (e.g. an in-process DirectRelayer). */
   relayers?: RelayerPort[];
   /** Highest relayer fee accepted per token (0n = ETH), in base units. Higher quotes are refused. */
@@ -73,7 +77,7 @@ export class Occulta {
   }
 
   /** Changes settings a user can edit (e.g. adding a relay); they apply from the next start(). */
-  configure(changes: Partial<Pick<OccultaOptions, 'networks' | 'libp2pRelays' | 'relayers' | 'maxFee' | 'disputeWindow'>>): void {
+  configure(changes: Partial<Pick<OccultaOptions, 'networks' | 'libp2pRelays' | 'relayers' | 'rpcUrls' | 'rpcFallback' | 'maxFee' | 'disputeWindow'>>): void {
     this.options = { ...this.options, ...changes };
   }
 
@@ -100,7 +104,7 @@ export class Occulta {
     const { wallet, keys, prover, options } = this;
     const accountId = wallet.activeAccount().id;
     const network = this.network();
-    const chain = new ChainAdapter(network);
+    const chain = new ChainAdapter(network, { rpcUrls: this.rpcUrls() });
     const poolStore = new PoolRepository(wallet, network.id);
     const pool = new PoolService({ wallet, keys, chain, prover, repository: poolStore });
     const session: Session = { accountId, network, chain, pool, p2p: null, channels: null, disputes: null, stores: [poolStore] };
@@ -137,6 +141,14 @@ export class Occulta {
     this.session = null;
     for (const store of session?.stores ?? []) store.close();
     await session?.p2p?.stop();
+  }
+
+  /** The RPC endpoints of the selected network, in the order they are tried. */
+  rpcUrls(): string[] {
+    const own = this.options.rpcUrls ?? [];
+    const defaults = defaultRpcUrls(this.network());
+    if (own.length === 0) return defaults;
+    return [...new Set(this.options.rpcFallback === false ? own : [...own, ...defaults])];
   }
 
   /** Locks the wallet and forgets every derived key. */

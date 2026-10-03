@@ -49,6 +49,8 @@ async function main(argv: string[]): Promise<void> {
     networks,
     libp2pRelays: config.libp2pRelays,
     relayers: config.relayers?.map((url) => new HttpRelayer(url)),
+    rpcUrls: config.chainRpcs,
+    rpcFallback: config.chainRpcFallback,
     maxFee: maxFeesOf(config, networks),
   });
   if (config.command === 'init') return init(config, occulta);
@@ -96,7 +98,7 @@ async function start(config: Config, occulta: Occulta, logger: Logger): Promise<
     if (account.id === wallet.activeAccount().id) throw new AppError(409, 'RELAYER_ACCOUNT', 'The relayer account cannot be the active account');
     if (account.used) throw new AppError(409, 'RELAYER_ACCOUNT', 'This account has made deposits; choose an unused account for relaying');
     relayerAccountId = account.id;
-    relayer = new RelayerService(new ChainAdapter(network), {
+    relayer = new RelayerService(new ChainAdapter(network, { rpcUrls: occulta.rpcUrls() }), {
       account: wallet.signer(account.id),
       keys: await keys.poolKeys(account.id),
       fees: { [zeroAddress]: parseAmount('eth', config.relayer.feeEth as string), [network.usdg]: parseAmount('usdg', config.relayer.feeUsdg as string) },

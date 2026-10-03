@@ -20,6 +20,9 @@ export const ConfigSchema = z
     networkFile: z.string().optional(),
     libp2pRelays: z.array(z.string()).optional(),
     relayers: z.array(z.url()).optional(),
+    /** The user's own RPC endpoints of the chain, tried first; the network's own follow unless `chainRpcFallback` is off. */
+    chainRpcs: z.array(z.url()).optional(),
+    chainRpcFallback: z.boolean(),
     maxFee: z.object({ eth: decimal.optional(), usdg: decimal.optional() }),
     rpc: z.object({ enabled: z.boolean(), port, tokenFile: z.string() }),
     relayer: z.object({ enabled: z.boolean(), host: z.string(), port, account: z.string().optional(), feeEth: decimal.optional(), feeUsdg: decimal.optional() }),
@@ -50,6 +53,8 @@ Options:
   --network-file <path>         Custom chain configuration (JSON)
   --libp2p-relays <a,b>         libp2p relays for this node's channels
   --relayers <url,url>          Transaction relayers to use
+  --chain-rpcs <url,url>        Your own RPC endpoints of the chain, tried first
+  --no-chain-rpc-fallback       Never use the network's public endpoints, even when yours fail
   --max-fee-eth <amount>        Highest relayer fee to accept in ETH
   --max-fee-usdg <amount>       Highest relayer fee to accept in USDG
   --rpc                         Serve the local RPC API (127.0.0.1 only, access token)
@@ -85,6 +90,8 @@ export function loadConfig(argv: string[]): Config {
       'network-file': { type: 'string' },
       'libp2p-relays': { type: 'string' },
       relayers: { type: 'string' },
+      'chain-rpcs': { type: 'string' },
+      'chain-rpc-fallback': { type: 'boolean' },
       'max-fee-eth': { type: 'string' },
       'max-fee-usdg': { type: 'string' },
       rpc: { type: 'boolean' },
@@ -115,6 +122,8 @@ export function loadConfig(argv: string[]): Config {
     networkFile: values['network-file'],
     libp2pRelays: list(values['libp2p-relays']),
     relayers: list(values.relayers),
+    chainRpcs: list(values['chain-rpcs']),
+    chainRpcFallback: values['chain-rpc-fallback'] ?? true,
     maxFee: { eth: values['max-fee-eth'], usdg: values['max-fee-usdg'] },
     rpc: { enabled: values.rpc ?? false, port: values['rpc-port'] ?? 8645, tokenFile: values['rpc-token-file'] ?? join(homedir(), '.config', 'occulta', 'rpc.json') },
     relayer: {
