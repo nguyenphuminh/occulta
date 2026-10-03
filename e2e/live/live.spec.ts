@@ -281,6 +281,9 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
       }
     }
     const aliceChannel = channelView(a);
+    // Bob's list shows the new channel at its next refresh, above the one closed in the test before.
+    await openChannels(bobPage);
+    await expect(bobPage.getByTestId('channel-item').first()).not.toContainText('Closed');
     const bobChannel = await openChannel(bobPage);
     await expect(bobChannel).toContainText('Live', { timeout: 300_000 });
     await expect(bobChannel.getByRole('heading', { level: 2 })).toHaveText('Alice');
