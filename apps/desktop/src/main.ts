@@ -111,9 +111,12 @@ async function start(config: Config, occulta: Occulta, logger: Logger): Promise<
     const first = wallet.accounts()[0]?.id as string;
     const seed = hexToBytes(keccak256(concat([(await keys.poolKeys(first)).seed, stringToHex('libp2p-relay')])));
     relayNode = await createRelayNode({ listen: [`/ip4/${config.libp2pRelay.host}/tcp/${config.libp2pRelay.port}/ws`], announce: config.libp2pRelay.announce, seed });
-    // Without a relay list, a node that is a libp2p relay reaches its own peers through itself.
-    const own = relayNode.getMultiaddrs().map(String);
-    if (!config.libp2pRelays) occulta.configure({ libp2pRelays: [own.find((a) => a.startsWith('/ip4/127.0.0.1/')) ?? (own[0] as string)] });
+    // Without a relay list, a node that is a libp2p relay reaches its own peers through itself, over
+    // its local address: an announced public name may not resolve yet, and would loop out and back in.
+    // Its invites still carry the announced address, which the relay gives with the reservation.
+    const local = config.libp2pRelay.host === '0.0.0.0' ? '127.0.0.1' : config.libp2pRelay.host;
+    const own = `/ip4/${local}/tcp/${config.libp2pRelay.port}/ws/p2p/${relayNode.peerId.toString()}`;
+    if (!config.libp2pRelays) occulta.configure({ libp2pRelays: [own] });
   }
 
   await occulta.start();
