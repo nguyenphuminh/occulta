@@ -30,7 +30,16 @@ export function PublicCard() {
           <EyeIcon /> Public balance · visible on-chain
         </span>
       </div>
-      <div className="hero-address">
+      <div className="big-amounts">
+        <span className="big" data-testid="public-eth">
+          {balances.data ? formatAmount('eth', balances.data.eth) : '…'}
+        </span>
+        <span className="medium" data-testid="public-usdg">
+          {balances.data ? formatAmount('usdg', balances.data.usdg) : '…'}
+        </span>
+      </div>
+      <ErrorNote error={balances.error} />
+      <div className="hero-details">
         <div className="detail-row">
           <div className="row-main">
             <span className="detail-label">Public address</span>
@@ -42,15 +51,6 @@ export function PublicCard() {
         </div>
         <p className="hero-note">{PUBLIC_ADDRESS_TEXT}</p>
       </div>
-      <div className="big-amounts">
-        <span className="big" data-testid="public-eth">
-          {balances.data ? formatAmount('eth', balances.data.eth) : '…'}
-        </span>
-        <span className="medium" data-testid="public-usdg">
-          {balances.data ? formatAmount('usdg', balances.data.usdg) : '…'}
-        </span>
-      </div>
-      <ErrorNote error={balances.error} />
     </section>
   );
 }

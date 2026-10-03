@@ -27,18 +27,6 @@ export function ShieldedHero() {
           Sync now
         </Button>
       </div>
-      <div className="hero-address">
-        <div className="detail-row">
-          <div className="row-main">
-            <span className="detail-label">Shielded address</span>
-            <span className="address mono" data-testid="shielded-address" title={address.data ?? undefined}>
-              {address.data ? shortAddress(address.data) : '…'}
-            </span>
-          </div>
-          {address.data ? <Copy text={address.data} label="Copy shielded address" className="ghost small on-dark" /> : null}
-        </div>
-        <p className="hero-note">{SHIELDED_ADDRESS_TEXT}</p>
-      </div>
       <div className="big-amounts">
         <span className="big" data-testid="shielded-eth">
           {formatAmount('eth', balances.get(0n) ?? 0n)}
@@ -56,6 +44,16 @@ export function ShieldedHero() {
         <ActionLink href="#/send" icon={<SendIcon />} label="Send" />
       </nav>
       <div className="hero-details">
+        <div className="detail-row">
+          <div className="row-main">
+            <span className="detail-label">Shielded address</span>
+            <span className="address mono" data-testid="shielded-address" title={address.data ?? undefined}>
+              {address.data ? shortAddress(address.data) : '…'}
+            </span>
+          </div>
+          {address.data ? <Copy text={address.data} label="Copy shielded address" className="ghost small on-dark" /> : null}
+        </div>
+        <p className="hero-note">{SHIELDED_ADDRESS_TEXT}</p>
         <details className="notes">
           <summary>
             {notes.length} unspent {notes.length === 1 ? 'note' : 'notes'}

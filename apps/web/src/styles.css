@@ -617,20 +617,8 @@ svg {
   margin-bottom: 4px;
 }
 
-.hero-address {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.hero-address .row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 /* The address others pay: short, and easy to read. */
-.hero-address .address {
+.hero-details .address {
   font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: 0.02em;
