@@ -165,6 +165,7 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
     await expect(open).toBeHidden();
     const request = bob.getByRole('dialog', { name: 'Channel request' });
     await expect(request).toContainText('They fund 0.03 ETH and ask you to fund 0.02 ETH');
+    await expect(request).toContainText('Dispute window: 7 days'); // the window of the channel Alice's website proposed
     await expect(request).toContainText(/\d+ s left to answer/);
     // Bob puts the request aside and answers it from his channel list.
     await request.getByRole('button', { name: 'Close' }).click();

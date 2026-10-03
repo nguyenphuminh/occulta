@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { generateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { parseEther } from 'viem';
+import { formatEther, parseEther } from 'viem';
 import { ChainAdapter, type NetworkConfig } from '../../packages/framework/src/modules/chain/index.ts';
 import { ChannelRepository } from '../../packages/framework/src/modules/channel/index.ts';
 import { shieldedAddressOf } from '../../packages/framework/src/modules/keys/index.ts';
@@ -119,7 +119,12 @@ describe('desktop client on the dev node', () => {
       env,
     );
     children.push(node.child);
+    const previousToken = token;
     ({ url: rpcUrl, token } = JSON.parse(await readFile(tokenFile, 'utf8')) as { url: string; token: string });
+    // A new access token at every start, and never in the data folder.
+    expect(token).not.toBe(previousToken);
+    expect(await readdir(dataDir)).toEqual(['occulta.wallet.json']);
+    expect(await readFile(join(dataDir, 'occulta.wallet.json'), 'utf8')).not.toContain(token);
     expect(node.ready.relayer).toBe(`http://127.0.0.1:${relayerPort}`);
     const relayAddr = node.ready.libp2pRelay?.[0] as string;
     expect(relayAddr).toMatch(new RegExp(`^/ip4/127.0.0.1/tcp/${relayPort}/ws/p2p/`));
@@ -165,6 +170,23 @@ describe('desktop client on the dev node', () => {
     expect(website.accounts().map((a) => a.id)).toEqual([firstAccount, relayerAccount]);
     expect(website.networkId()).toBe(network.id);
     expect(new ChannelRepository(website).all().map((c) => [c.id, c.status])).toEqual([[opened.id, 'closed']]);
+
+    // And the other way round: the website's export file starts a desktop client with its accounts, notes and channels.
+    const webExport = join(tmp, 'web-export.json');
+    await writeFile(webExport, await web.wallet.exportFile());
+    const [webData, webTokenFile] = [join(tmp, 'web-data'), join(tmp, 'web-rpc.json')];
+    expect((await run(['init', '--import-file', webExport, '--data-dir', webData], env)).code).toBe(0);
+    const fromWebsite = await startNode(
+      [...base.map((a) => (a === dataDir ? webData : a === tokenFile ? webTokenFile : a)), '--rpc-port', String(await freePort()), '--libp2p-relays', relayAddr, '--relayers', node.ready.relayer as string],
+      env,
+    );
+    children.push(fromWebsite.child);
+    const asWebsite = JSON.parse(await readFile(webTokenFile, 'utf8')) as { url: string; token: string };
+    const webRpc = <T>(command: string) => desktopRpc<T>(asWebsite, command, {});
+    expect((await webRpc<{ id: string }[]>('accounts')).map((a) => a.id)).toEqual(web.wallet.accounts().map((a) => a.id));
+    expect(await webRpc('balance')).toMatchObject({ eth: `${formatEther(web.pool.balances().get(ETH) ?? 0n)} ETH` });
+    expect((await webRpc<{ id: string; status: string }[]>('channels')).map((c) => [c.id, c.status])).toEqual([[opened.id, 'closed']]);
+    expect(await stop(fromWebsite.child)).toBe(0);
     expect(await stop(node.child)).toBe(0);
   });
 });
