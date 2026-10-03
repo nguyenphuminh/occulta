@@ -14,6 +14,9 @@ async function shell(): Promise<ShellService> {
       throw new Error('no libp2p here');
     },
     kdf: { N: 2 ** 10, r: 8, p: 1 },
+    // Offline: none of the network's own relayers or relays, whatever its configuration lists.
+    relayers: [],
+    libp2pRelays: [],
   });
   await occulta.wallet.createFromPhrase(generateMnemonic(wordlist, 128), 'password123');
   await occulta.start();

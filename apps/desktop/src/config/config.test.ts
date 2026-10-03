@@ -24,6 +24,8 @@ describe('desktop configuration', () => {
       '--relayer-fee-usdg',
       '0.01',
       '--libp2p-relay',
+      '--libp2p-relay-announce',
+      '/dns4/relay.example/tcp/443/wss',
       '--libp2p-relays',
       '/ip4/1.2.3.4/tcp/1/ws/p2p/x, /dns4/r/tcp/2/wss/p2p/y',
       '--relayers',
@@ -35,6 +37,7 @@ describe('desktop configuration', () => {
     expect(c.rpc).toMatchObject({ enabled: true, port: 9000 });
     expect(c.relayer).toMatchObject({ enabled: true, account: '0xabc', feeEth: '0.0001', feeUsdg: '0.01', port: 8646 });
     expect(c.libp2pRelays).toEqual(['/ip4/1.2.3.4/tcp/1/ws/p2p/x', '/dns4/r/tcp/2/wss/p2p/y']);
+    expect(c.libp2pRelay).toMatchObject({ enabled: true, announce: ['/dns4/relay.example/tcp/443/wss'] });
     expect(c.relayers).toEqual(['https://relay.example']);
     expect(c.shell).toBe(false);
     expect(c.tickSeconds).toBe(5);

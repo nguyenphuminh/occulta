@@ -23,7 +23,7 @@ export const ConfigSchema = z
     maxFee: z.object({ eth: decimal.optional(), usdg: decimal.optional() }),
     rpc: z.object({ enabled: z.boolean(), port, tokenFile: z.string() }),
     relayer: z.object({ enabled: z.boolean(), host: z.string(), port, account: z.string().optional(), feeEth: decimal.optional(), feeUsdg: decimal.optional() }),
-    libp2pRelay: z.object({ enabled: z.boolean(), host: z.string(), port }),
+    libp2pRelay: z.object({ enabled: z.boolean(), host: z.string(), port, announce: z.array(z.string()).optional() }),
     shell: z.boolean(),
     tickSeconds: z.coerce.number().int().min(1),
   })
@@ -64,6 +64,8 @@ Options:
   --libp2p-relay                Act as a libp2p relay for other users
   --libp2p-relay-host <host>    (default 0.0.0.0)
   --libp2p-relay-port <port>    (default 8647)
+  --libp2p-relay-announce <a,b> Public addresses to give peers instead of the listen address,
+                                e.g. /dns4/relay.example/tcp/443/wss behind a TLS proxy
   --no-shell                    Do not open the interactive shell
   --tick <seconds>              Background sync and channel watching interval (default 15)
   --log-level <level>           (default info)`;
@@ -97,6 +99,7 @@ export function loadConfig(argv: string[]): Config {
       'libp2p-relay': { type: 'boolean' },
       'libp2p-relay-host': { type: 'string' },
       'libp2p-relay-port': { type: 'string' },
+      'libp2p-relay-announce': { type: 'string' },
       shell: { type: 'boolean' },
       tick: { type: 'string' },
       help: { type: 'boolean' },
@@ -122,7 +125,12 @@ export function loadConfig(argv: string[]): Config {
       feeEth: values['relayer-fee-eth'],
       feeUsdg: values['relayer-fee-usdg'],
     },
-    libp2pRelay: { enabled: values['libp2p-relay'] ?? false, host: values['libp2p-relay-host'] ?? '0.0.0.0', port: values['libp2p-relay-port'] ?? 8647 },
+    libp2pRelay: {
+      enabled: values['libp2p-relay'] ?? false,
+      host: values['libp2p-relay-host'] ?? '0.0.0.0',
+      port: values['libp2p-relay-port'] ?? 8647,
+      announce: list(values['libp2p-relay-announce']),
+    },
     shell: values.shell ?? true,
     tickSeconds: values.tick ?? 15,
   });

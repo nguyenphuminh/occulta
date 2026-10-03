@@ -17,11 +17,14 @@ const RELAY_LIMITS = { applyDefaultLimit: false, maxReservations: 1024 };
 /**
  * The desktop client's libp2p relay mode (BRD 2.2.15): reachable over WebSockets (for web wallets)
  * and TCP. It forwards encrypted connections and records nothing about who talks to whom.
+ * `announce` replaces the listen addresses in what the relay tells peers, e.g. its public
+ * `/dns4/…/tcp/443/wss` address when it listens privately behind a TLS proxy; peers put these
+ * addresses in their invites.
  */
-export async function createRelayNode(options: { listen: string[]; seed?: Uint8Array }): Promise<Libp2p> {
+export async function createRelayNode(options: { listen: string[]; announce?: string[]; seed?: Uint8Array }): Promise<Libp2p> {
   return createLibp2p({
     ...(options.seed ? { privateKey: await generateKeyPairFromSeed('Ed25519', options.seed) } : {}),
-    addresses: { listen: options.listen },
+    addresses: { listen: options.listen, ...(options.announce?.length ? { announce: options.announce } : {}) },
     transports: [tcp(), webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],

@@ -1,0 +1,13 @@
+// The website on Cloudflare: the built files served as Workers static assets, on occulta.space.
+// Deployed by `npm run deploy:live` (scripts/deploy-live.ts); Cloudflare creates the DNS records
+// and certificates for the custom domains.
+{
+  "name": "occulta-web",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" },
+  "routes": [
+    { "pattern": "occulta.space", "custom_domain": true },
+    { "pattern": "www.occulta.space", "custom_domain": true }
+  ],
+  "workers_dev": false
+}

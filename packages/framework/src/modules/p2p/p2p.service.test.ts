@@ -1,3 +1,4 @@
+import { createServer } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Libp2p } from '@libp2p/interface';
 import { AppError } from '../../shared/errors/AppError.ts';
@@ -60,4 +61,37 @@ describe('peer-to-peer messaging through a relay', () => {
     const gone = { ...bob.invite('x'), addrs: [bob.invite('x').addrs[0]!.replace(bob.peerId, alice.peerId.replace(/.$/, 'X'))] };
     await expect(alice.request(gone, { type: 'hello' })).rejects.toMatchObject({ code: 'PEER_UNREACHABLE' });
   });
+});
+
+/** A free local TCP port. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer().listen(0, '127.0.0.1', () => {
+      const { port } = server.address() as { port: number };
+      server.close(() => resolve(port));
+    });
+    server.on('error', reject);
+  });
+}
+
+describe('a relay behind a public name', () => {
+  it('gives peers its announced address, so their invites never carry the address it listens on', async () => {
+    // As on a server: listening on one address, reached by peers under a DNS name (here localhost).
+    const port = await freePort();
+    const announce = `/dns4/localhost/tcp/${port}/ws`;
+    const relay = await createRelayNode({ listen: [`/ip4/127.0.0.1/tcp/${port}/ws`], announce: [announce] });
+    const relayAddr = `${announce}/p2p/${relay.peerId.toString()}`;
+    const alice = new P2PService(await createPeerNode({ relays: [relayAddr] }));
+    const bob = new P2PService(await createPeerNode({ relays: [relayAddr] }));
+    try {
+      await bob.listen(async () => 'hi');
+      await bob.waitForRelay();
+      const invite = bob.invite('x');
+      expect(invite.addrs.length).toBeGreaterThan(0);
+      for (const a of invite.addrs) expect(a.startsWith(`${relayAddr}/p2p-circuit/p2p/`)).toBe(true);
+      expect(await alice.request(invite, { type: 'hello' })).toBe('hi');
+    } finally {
+      await Promise.all([alice.stop(), bob.stop(), relay.stop()]);
+    }
+  }, 60_000);
 });

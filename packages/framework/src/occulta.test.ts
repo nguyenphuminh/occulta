@@ -20,6 +20,9 @@ async function node(options: Partial<OccultaOptions> = {}): Promise<Occulta> {
       throw new Error('no libp2p in this test');
     },
     kdf: FAST_KDF,
+    // Offline: none of the network's own relayers or relays, whatever its configuration lists.
+    relayers: [],
+    libp2pRelays: [],
     ...options,
   });
   await occulta.wallet.createFromPhrase(generateMnemonic(wordlist, 128), 'password123');

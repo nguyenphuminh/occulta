@@ -19,6 +19,7 @@
     "devnode": "node scripts/devnode.ts",
     "deploy:devnode": "node scripts/deploy.ts",
     "deploy:network": "node scripts/deploy-network.ts",
+    "deploy:live": "node scripts/deploy-live.ts",
     "demo": "node scripts/demo.ts",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -40,6 +41,7 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.0",
     "viem": "^2.57.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
   }
 }

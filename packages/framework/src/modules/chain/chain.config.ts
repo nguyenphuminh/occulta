@@ -48,8 +48,9 @@ export const BUILT_IN_NETWORKS: readonly NetworkConfig[] = [
     usdg: '0xFFC95faa3d63Cde504a05B567C600B78C0b41892',
     // Deployed 2026-10-02 (production build: 3–7 day dispute window).
     contracts: { pool: '0x5CfB7B562baa70135590162609B480d5773aDF5a', disputes: '0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83', deployBlock: 314_992_300n },
-    relayers: [],
-    libp2pRelays: [],
+    // The live relay host (npm run deploy:live): one desktop client as both relayer and libp2p relay.
+    relayers: ['https://relay.occulta.space'],
+    libp2pRelays: ['/dns4/relay.occulta.space/tcp/443/wss/p2p/12D3KooWExZXWgpmX2sTEGGKNMniT7aMirRHAH2wnoMZVt1Y6ue3'],
   },
   {
     id: 'robinhood-mainnet',

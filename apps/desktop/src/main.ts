@@ -110,7 +110,7 @@ async function start(config: Config, occulta: Occulta, logger: Logger): Promise<
     // A stable relay identity, derived from the wallet's first account and unrelated to its channel identity.
     const first = wallet.accounts()[0]?.id as string;
     const seed = hexToBytes(keccak256(concat([(await keys.poolKeys(first)).seed, stringToHex('libp2p-relay')])));
-    relayNode = await createRelayNode({ listen: [`/ip4/${config.libp2pRelay.host}/tcp/${config.libp2pRelay.port}/ws`], seed });
+    relayNode = await createRelayNode({ listen: [`/ip4/${config.libp2pRelay.host}/tcp/${config.libp2pRelay.port}/ws`], announce: config.libp2pRelay.announce, seed });
     // Without a relay list, a node that is a libp2p relay reaches its own peers through itself.
     const own = relayNode.getMultiaddrs().map(String);
     if (!config.libp2pRelays) occulta.configure({ libp2pRelays: [own.find((a) => a.startsWith('/ip4/127.0.0.1/')) ?? (own[0] as string)] });
