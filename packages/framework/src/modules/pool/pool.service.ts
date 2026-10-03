@@ -49,6 +49,8 @@ export class PoolService {
   private events: CommitmentEvent[] = [];
   private nullifiers = new Set<bigint>();
   private scannedTo = -1n;
+  /** Spends run one after another: two at once could pick the same notes. */
+  private spending: Promise<unknown> = Promise.resolve();
 
   constructor(deps: PoolDeps) {
     this.deps = deps;
@@ -184,14 +186,13 @@ export class PoolService {
   }
 
   /** Builds, proves and relays one transfer whose outputs are [payment or change, change or empty, fee note]. */
-  async spend(args: {
-    token: bigint;
-    payment?: { note: NotePreimage; encryptTo: Uint8Array };
-    publicAmount: bigint;
-    recipient: Address;
-    relayer: RelayerPort;
-    accountId?: string;
-  }): Promise<Hex> {
+  spend(args: SpendArgs): Promise<Hex> {
+    const run = this.spending.then(() => this.spendNow(args));
+    this.spending = run.catch(() => undefined);
+    return run;
+  }
+
+  private async spendNow(args: SpendArgs): Promise<Hex> {
     const { token, payment, publicAmount, recipient, relayer } = args;
     const accountId = args.accountId ?? this.deps.wallet.activeAccount().id;
     await this.sync(accountId);
@@ -259,8 +260,17 @@ export class PoolService {
     const total = notes.reduce((s, n) => s + n.amount, 0n);
     if (notes.length < 2 || total <= fee) throw new AppError(409, 'NOTES_FRAGMENTED', 'Too many small notes to cover this amount');
     const self: NotePreimage = { amount: total - fee, token, ownerTag: keys.ownerTag, salt: randomFieldElement() };
-    await this.spend({ token, payment: { note: self, encryptTo: keys.encryption.publicKey }, publicAmount: 0n, recipient: zeroAddress, relayer, accountId });
+    await this.spendNow({ token, payment: { note: self, encryptTo: keys.encryption.publicKey }, publicAmount: 0n, recipient: zeroAddress, relayer, accountId });
   }
+}
+
+interface SpendArgs {
+  token: bigint;
+  payment?: { note: NotePreimage; encryptTo: Uint8Array };
+  publicAmount: bigint;
+  recipient: Address;
+  relayer: RelayerPort;
+  accountId?: string;
 }
 
 /** Picks one note, else the cheapest pair of notes, that covers `need` (transfers have two inputs). */

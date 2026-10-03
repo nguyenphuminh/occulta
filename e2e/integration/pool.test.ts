@@ -77,6 +77,17 @@ describe('pool and relayer services on the dev node', () => {
     expect(carol.pool.balances().get(ETH)).toBe(parseEther('0.005') - 2n * fees.eth);
   });
 
+  it('runs spends started together one after the other, so they never pick the same note', async () => {
+    const dave = await newUser(chain.network, chain);
+    await dave.pool.deposit(ETH, parseEther('0.05'));
+    const bobAddress = shieldedAddressOf(await bob.keys.poolKeys());
+    const exit = privateKeyToAccount(generatePrivateKey()).address;
+    // Both would pick the one note; the second has to wait for the first's change.
+    await Promise.all([dave.pool.transfer(bobAddress, ETH, parseEther('0.01'), relayer.port), dave.pool.withdraw(ETH, parseEther('0.01'), exit, relayer.port)]);
+    expect(await chain.publicBalance(exit, ETH)).toBe(parseEther('0.01'));
+    expect(dave.pool.balances().get(ETH)).toBe(parseEther('0.03') - 2n * fees.eth);
+  });
+
   it('refuses what it cannot do: too little money, a relayer that is not paid, a locked wallet', async () => {
     const bobAddress = shieldedAddressOf(await bob.keys.poolKeys());
     expect(await code(alice.pool.transfer(bobAddress, ETH, parseEther('5'), relayer.port))).toBe('INSUFFICIENT_FUNDS');
