@@ -29,6 +29,8 @@ export class PendingOpens {
   private readonly fundingErrors = new Map<string, string>();
   /** Channels accepted by the other side that this tab is still funding. */
   private readonly funding = new Set<string>();
+  /** The channel each handed-over request became, so its old address still leads there. */
+  private readonly handedOver = new Map<string, string>();
   private readonly listeners = new Set<() => void>();
   private next = 0;
 
@@ -43,6 +45,7 @@ export class PendingOpens {
       if (channelId !== null || !this.has(id)) return;
       channelId = channel;
       this.funding.add(channel);
+      this.handedOver.set(id, channel);
       this.items = this.items.filter((p) => p.id !== id);
       this.emit();
       onOpened(id, channel);
@@ -70,6 +73,11 @@ export class PendingOpens {
       },
     );
     return id;
+  }
+
+  /** The channel a request became, if it was handed over. */
+  channelFor(pendingId: string): string | null {
+    return this.handedOver.get(pendingId) ?? null;
   }
 
   /** Whether this tab is still funding a channel the other side accepted. */
@@ -101,6 +109,7 @@ export class PendingOpens {
     this.items = [];
     this.fundingErrors.clear();
     this.funding.clear();
+    this.handedOver.clear();
     this.emit();
   }
 

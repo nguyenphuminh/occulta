@@ -40,6 +40,7 @@ describe('channel opens in progress', () => {
     expect(store.list('acct', 'net')).toEqual([]);
     expect(onOpened).toHaveBeenCalledWith(id, 'channel-1');
     expect(changes).toHaveBeenCalledTimes(2);
+    expect(store.channelFor(id)).toBe('channel-1'); // the request's address still leads to its channel
 
     // Funded: the channel moved on, so the page redraws; nothing is handed over twice.
     open.resolve({ id: 'channel-1' });

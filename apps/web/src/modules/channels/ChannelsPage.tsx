@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { balanceOf, isAppError, sideOf, type ChannelService } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { formatAmount, tokenName } from '../../shared/amounts.ts';
@@ -71,6 +72,11 @@ function ChannelItem({ id, on, peerId, names, amount, line, status, statusText }
  */
 export function ChannelsPage({ view }: { view: ChannelsView }) {
   const { occulta, prompts, pendingOpens, version } = useApp();
+  // A request that already became its channel (say, clicked just as the other side accepted) leads to the channel.
+  const handedOver = view.kind === 'channel' ? pendingOpens.channelFor(view.id) : null;
+  useEffect(() => {
+    if (handedOver) location.replace(`#/channels/${handedOver}`);
+  }, [handedOver]);
   let channels: ChannelService;
   try {
     channels = occulta.channels;

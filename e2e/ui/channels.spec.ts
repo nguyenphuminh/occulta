@@ -208,6 +208,10 @@ test('a channel that asks the invitee to fund needs approval; a dispute can be s
       await expect(bob.getByTestId('channel-item')).toHaveCount(1);
       // Alice was looking at the request: she follows it to the channel, listed once.
       await expect(alice).toHaveURL(/#\/channels\/[0-9a-f]{32}$/);
+      // The request's old address leads to the channel too, e.g. going back to it.
+      const channelUrl = alice.url();
+      await alice.goBack();
+      await expect(alice).toHaveURL(channelUrl);
       await expect(waiting).toBeHidden();
       await expect(alice.getByTestId('channel-item')).toHaveCount(1);
     }

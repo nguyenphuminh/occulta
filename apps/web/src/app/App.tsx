@@ -86,9 +86,9 @@ export function App() {
   }, [occulta, refresh]);
 
   const lock = useCallback(async () => {
-    pendingOpens.clear();
     await occulta.lock();
     setPhase('locked');
+    pendingOpens.clear(); // after the wallet screen is gone: its redraw would ask the stopped node for channels
   }, [occulta, pendingOpens]);
 
   useEffect(() => {
