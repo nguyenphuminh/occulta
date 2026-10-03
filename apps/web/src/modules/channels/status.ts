@@ -10,4 +10,5 @@ export const STATUS_TEXT: Record<ChannelRecord['status'], string> = {
   settled: 'Settled',
 };
 
-export const peerName = (r: ChannelRecord) => `Peer ${r.peer.peerId.slice(-6)}`;
+/** The user's nickname for the peer, else a short form of its peer id. */
+export const peerName = (peerId: string, names: Record<string, string>) => names[peerId] ?? `Peer ${peerId.slice(-6)}`;

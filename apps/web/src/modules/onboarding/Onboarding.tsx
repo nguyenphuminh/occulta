@@ -1,11 +1,46 @@
 import { useState, type ReactNode } from 'react';
 import { MIN_PASSWORD_LENGTH, type Occulta } from '@occulta/framework';
-import { ChannelsIcon, KeyIcon, ShieldIcon } from '../../shared/icons.tsx';
+import { ChannelsIcon, CloseIcon, KeyIcon, ShieldIcon } from '../../shared/icons.tsx';
 import { Button, Card, ErrorNote, Field, Glows, Hero, Notice, useAction } from '../../shared/ui.tsx';
 
-/** BRD 2.2.14: the website states this wherever a phrase could be asked for. */
+const PHRASE_TEXT = 'Occulta only ever asks for your recovery phrase when you import a wallet. Never type it anywhere else.';
+const PHRASE_BANNER_CLOSED = 'occulta.phraseBannerClosed';
+
+/** BRD 2.2.14: stated on every form that takes a phrase, and it cannot be closed there. */
 export function PhraseNotice() {
-  return <Notice tone="warn">Occulta only ever asks for your recovery phrase when you import a wallet. Never type it anywhere else.</Notice>;
+  return <Notice tone="warn">{PHRASE_TEXT}</Notice>;
+}
+
+/** The same statement at the top of every unlocked page; once closed, it stays closed in this browser. */
+export function PhraseBanner() {
+  const [closed, setClosed] = useState(() => {
+    try {
+      return localStorage.getItem(PHRASE_BANNER_CLOSED) === '1';
+    } catch {
+      return false;
+    }
+  });
+  if (closed) return null;
+  return (
+    <div className="notice warn banner" role="note">
+      <span>{PHRASE_TEXT}</span>
+      <button
+        type="button"
+        className="icon-button tiny"
+        aria-label="Close this notice"
+        onClick={() => {
+          try {
+            localStorage.setItem(PHRASE_BANNER_CLOSED, '1');
+          } catch {
+            // Storage blocked: it stays closed until the page reloads.
+          }
+          setClosed(true);
+        }}
+      >
+        <CloseIcon />
+      </button>
+    </div>
+  );
 }
 
 /** Full-screen layout of the screens shown before the wallet is unlocked. */
@@ -176,6 +211,7 @@ export function RestoreWallet({ occulta, onReady }: { occulta: Occulta; onReady:
   });
   return (
     <Card title="Restore from an export file" className="auth-card">
+      <PhraseNotice />
       <Field label="Export file">
         <input type="file" accept=".json,application/json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </Field>
@@ -191,10 +227,12 @@ export function RestoreWallet({ occulta, onReady }: { occulta: Occulta; onReady:
 }
 
 const FEATURES = [
-  { icon: <ShieldIcon />, title: 'Private by default', text: 'Your funds sit in a shared pool. Payments inside it reveal no sender, recipient or amount.' },
-  { icon: <KeyIcon />, title: 'Your keys stay here', text: 'Keys are made in this browser and stored only encrypted with your password. Nobody can recover them for you.' },
   { icon: <ChannelsIcon />, title: 'Instant channel payments', text: 'Open a channel with someone and pay back and forth off-chain, with no transaction per payment.' },
+  { icon: <ShieldIcon />, title: 'Private by default', text: 'Channels are funded from a shared pool. Payments inside it reveal no sender, recipient or amount.' },
+  { icon: <KeyIcon />, title: 'Your keys stay here', text: 'Keys are made in this browser and stored only encrypted with your password. Nobody can recover them for you.' },
 ];
+
+export const TAGLINE = 'Private ZK state channels on Arbitrum';
 
 /** First visit: create, import or restore a wallet (BRD 2.2.14.1). */
 export function Onboarding({ occulta, onReady }: { occulta: Occulta; onReady: () => Promise<void> }) {
@@ -223,7 +261,7 @@ export function Onboarding({ occulta, onReady }: { occulta: Occulta; onReady: ()
       <section className="welcome" aria-label="Welcome to Occulta">
         <Hero />
         <h1 className="display">Occulta</h1>
-        <p className="tagline">Private payments and payment channels on Arbitrum, with a wallet built into this page.</p>
+        <p className="tagline">{TAGLINE}, with a wallet built into this page.</p>
         <div className="features">
           {FEATURES.map((f, i) => (
             <details key={f.title} className="feature" open={i === 0}>
@@ -246,7 +284,6 @@ export function Onboarding({ occulta, onReady }: { occulta: Occulta; onReady: ()
             Restore from an export file
           </Button>
         </div>
-        <PhraseNotice />
       </section>
     </AuthLayout>
   );

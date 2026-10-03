@@ -10,12 +10,6 @@ function Icon({ children, ...rest }: SVGProps<SVGSVGElement> & { children: React
   );
 }
 
-export const HomeIcon = () => (
-  <Icon>
-    <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" />
-  </Icon>
-);
-
 export const ChannelsIcon = () => (
   <Icon>
     <path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3.5V6a1 1 0 0 1 1-1z" />
@@ -109,6 +103,34 @@ export const LinkIcon = () => (
 export const ArrowRightIcon = () => (
   <Icon>
     <path d="M5 12h14M13 6l6 6-6 6" />
+  </Icon>
+);
+
+export const WalletIcon = () => (
+  <Icon>
+    <path d="M4 7a2 2 0 0 1 2-2h11a1 1 0 0 1 1 1v2" />
+    <path d="M4 7v11a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-2z" />
+    <circle cx="16" cy="14" r="1.2" />
+  </Icon>
+);
+
+export const EyeIcon = () => (
+  <Icon>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
+export const EditIcon = () => (
+  <Icon>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+    <path d="m13.5 6.5 4 4" />
+  </Icon>
+);
+
+export const CloseIcon = () => (
+  <Icon>
+    <path d="M6 6l12 12M18 6 6 18" />
   </Icon>
 );
 

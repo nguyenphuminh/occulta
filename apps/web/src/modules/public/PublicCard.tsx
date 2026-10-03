@@ -1,6 +1,7 @@
 import { useApp } from '../../app/context.ts';
+import { PUBLIC_ADDRESS_TEXT } from '../../shared/addresses.ts';
 import { formatAmount, tokenId } from '../../shared/amounts.ts';
-import { SendIcon } from '../../shared/icons.tsx';
+import { EyeIcon } from '../../shared/icons.tsx';
 import { Card, Copy, ErrorNote, useLoad } from '../../shared/ui.tsx';
 
 /** The active account's public ETH and USDG on the selected network (BRD 2.2.14.4). */
@@ -24,10 +25,11 @@ export function PublicCard() {
   return (
     <Card
       title="Public balance"
+      className="public-card"
       actions={
-        <a className="pill-link" href="#/send-public">
-          <SendIcon /> Send publicly
-        </a>
+        <span className="pill public-tag">
+          <EyeIcon /> Visible on-chain
+        </span>
       }
     >
       <dl className="amounts">
@@ -46,6 +48,7 @@ export function PublicCard() {
         </span>
         <Copy text={address} label="Copy address" />
       </div>
+      <p className="muted small">{PUBLIC_ADDRESS_TEXT}</p>
       <ErrorNote error={balances.error} />
     </Card>
   );

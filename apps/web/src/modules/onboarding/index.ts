@@ -1,2 +1,2 @@
-export { Onboarding, PhraseNotice, RestoreWallet } from './Onboarding.tsx';
+export { Onboarding, PhraseBanner, RestoreWallet, TAGLINE } from './Onboarding.tsx';
 export { Unlock } from './Unlock.tsx';

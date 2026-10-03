@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChannelsPage, type ChannelsView } from '../modules/channels/index.ts';
-import { Home } from '../modules/home/index.ts';
-import { Onboarding, PhraseNotice, Unlock } from '../modules/onboarding/index.ts';
+import { MyWallet } from '../modules/home/index.ts';
+import { Onboarding, PhraseBanner, TAGLINE, Unlock } from '../modules/onboarding/index.ts';
 import { Deposit, SendPrivately, Withdraw } from '../modules/pool/index.ts';
-import { Receive, SendPublic } from '../modules/public/index.ts';
+import { Receive } from '../modules/public/index.ts';
 import { Settings } from '../modules/settings/index.ts';
 import { AccountBar } from '../modules/wallet/index.ts';
-import { ChannelsIcon, HomeIcon, Logo, SettingsIcon } from '../shared/icons.tsx';
+import { ChannelsIcon, Logo, SendIcon, SettingsIcon, WalletIcon } from '../shared/icons.tsx';
 import { errorText } from '../shared/ui.tsx';
 import { AppContext, type AppContextValue } from './context.ts';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
@@ -19,19 +19,22 @@ import { startNode } from './settings.ts';
 const TICK_MS = Number(import.meta.env.VITE_OCCULTA_TICK_MS ?? 10_000);
 
 type Route =
-  | { section: 'home'; page: 'home' | 'deposit' | 'send' | 'withdraw' | 'receive' | 'send-public' }
   | { section: 'channels'; view: ChannelsView }
+  | { section: 'wallet'; page: 'wallet' | 'deposit' | 'withdraw' | 'receive' }
+  | { section: 'transfer' }
   | { section: 'settings' };
 
+/** Channels are the product, so they are also where the app opens. */
 function routeOf(path: string): Route {
   if (path.startsWith('/invite/')) return { section: 'channels', view: { kind: 'open', invite: path.slice('/invite/'.length) } };
   if (path === '/channels/new') return { section: 'channels', view: { kind: 'open', invite: '' } };
   if (path === '/channels/invite') return { section: 'channels', view: { kind: 'invite' } };
   if (path.startsWith('/channels/')) return { section: 'channels', view: { kind: 'channel', id: path.slice('/channels/'.length) } };
-  if (path === '/channels') return { section: 'channels', view: { kind: 'none' } };
+  if (path === '/wallet') return { section: 'wallet', page: 'wallet' };
+  if (path === '/deposit' || path === '/withdraw' || path === '/receive') return { section: 'wallet', page: path.slice(1) as 'deposit' | 'withdraw' | 'receive' };
+  if (path === '/send') return { section: 'transfer' };
   if (path === '/settings') return { section: 'settings' };
-  const page = path.slice(1);
-  return { section: 'home', page: page === 'deposit' || page === 'send' || page === 'withdraw' || page === 'receive' || page === 'send-public' ? page : 'home' };
+  return { section: 'channels', view: { kind: 'none' } };
 }
 
 function useHashPath(): string {
@@ -46,26 +49,24 @@ function useHashPath(): string {
 
 function pageOf(route: Route): ReactNode {
   if (route.section === 'channels') return <ChannelsPage view={route.view} />;
+  if (route.section === 'transfer') return <SendPrivately />;
   if (route.section === 'settings') return <Settings />;
   switch (route.page) {
     case 'deposit':
       return <Deposit />;
-    case 'send':
-      return <SendPrivately />;
     case 'withdraw':
       return <Withdraw />;
     case 'receive':
       return <Receive />;
-    case 'send-public':
-      return <SendPublic />;
     default:
-      return <Home />;
+      return <MyWallet />;
   }
 }
 
 const NAV = [
-  { section: 'home', href: '#/', label: 'Home', icon: <HomeIcon /> },
   { section: 'channels', href: '#/channels', label: 'Channels', icon: <ChannelsIcon /> },
+  { section: 'wallet', href: '#/wallet', label: 'My wallet', icon: <WalletIcon /> },
+  { section: 'transfer', href: '#/send', label: 'Private transfer', icon: <SendIcon /> },
   { section: 'settings', href: '#/settings', label: 'Settings', icon: <SettingsIcon /> },
 ] as const;
 
@@ -124,9 +125,12 @@ export function App() {
     <AppContext.Provider value={context}>
       <div className={`shell section-${route.section}`}>
         <aside className="sidebar">
-          <a className="brand" href="#/">
+          <a className="brand" href="#/channels">
             <Logo size={34} />
-            <span>Occulta</span>
+            <span className="brand-text">
+              <span>Occulta</span>
+              <small className="brand-tagline">{TAGLINE}</small>
+            </span>
           </a>
           <nav className="nav" aria-label="Main">
             {NAV.map((n) => (
@@ -139,6 +143,7 @@ export function App() {
           <AccountBar />
         </aside>
         <main className="content">
+          <PhraseBanner />
           {problems.length > 0 ? (
             <ul className="problems" aria-label="Background problems">
               {problems.map((p) => (
@@ -149,9 +154,6 @@ export function App() {
           <ErrorBoundary key={route.section} resetKey={version}>
             {pageOf(route)}
           </ErrorBoundary>
-          <footer className="footer">
-            <PhraseNotice />
-          </footer>
         </main>
       </div>
       {prompt ? <PromptDialog prompt={prompt} onAnswer={(answer) => prompts.answer(answer)} /> : null}

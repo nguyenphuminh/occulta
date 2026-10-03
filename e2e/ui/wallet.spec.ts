@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { mnemonicToAccount, privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, goHome, openAction, openChannels, openSettings, phraseWords, setPassword, unlock, useDevNetwork } from './helpers.ts';
+import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, openAction, openChannels, openSettings, openWallet, phraseWords, setPassword, unlock, useDevNetwork } from './helpers.ts';
 
 /** Everything this website stored in IndexedDB, as text. */
 async function storedText(page: Page): Promise<string> {
@@ -22,7 +22,7 @@ async function storedText(page: Page): Promise<string> {
 
 test('creating a wallet: the phrase is shown once, 3 words must match, the password needs 8 characters', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Occulta only ever asks for your recovery phrase when you import a wallet')).toBeVisible();
+  await expect(page.getByText('Private ZK state channels on Arbitrum')).toBeVisible();
   await page.getByRole('button', { name: 'Create a new wallet' }).click();
   const words = await phraseWords(page);
   expect(words).toHaveLength(12);
@@ -47,6 +47,7 @@ test('creating a wallet: the phrase is shown once, 3 words must match, the passw
 
   // A new wallet starts on Arbitrum Sepolia, and the browser holds only the encrypted vault.
   await expect(page.getByLabel('Network', { exact: true })).toHaveValue('arbitrum-sepolia');
+  await openWallet(page);
   const address = mnemonicToAccount(words.join(' ')).address;
   await expect(page.getByTestId('public-address')).toHaveText(address);
   const stored = await storedText(page);
@@ -73,6 +74,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await page.getByRole('button', { name: 'Import a recovery phrase or private key' }).click();
   await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(phrase);
   await setPassword(page, 'Import wallet');
+  await openWallet(page);
   await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
 
   await openSettings(page);
@@ -85,7 +87,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await page.getByRole('dialog').getByRole('button', { name: 'Import' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByLabel('Account', { exact: true }).selectOption(privateKeyToAccount(key).address);
-  await goHome(page);
+  await openWallet(page);
   await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
 });
 
@@ -95,6 +97,7 @@ test('a wallet imported from a private key has that address and cannot derive ac
   await page.getByRole('button', { name: 'Import a recovery phrase or private key' }).click();
   await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(key);
   await setPassword(page, 'Import wallet');
+  await openWallet(page);
   await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
   await openSettings(page);
   await expect(page.getByRole('button', { name: 'Import key' })).toBeVisible();
@@ -117,7 +120,7 @@ test('a forgotten password is replaced by importing the phrase, after a warning'
   await page.getByLabel('Recovery phrase', { exact: true }).fill(phrase);
   await page.getByLabel('New wallet password', { exact: true }).fill('another password');
   await page.getByRole('button', { name: 'Reset wallet' }).click();
-  await goHome(page);
+  await openWallet(page);
   await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
   await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(1); // the imported key is gone
 });
@@ -143,7 +146,7 @@ test('the export file restores the wallet in a fresh browser and records when it
   await expect(other.getByRole('alert')).toHaveText('Wrong password');
   await other.getByLabel('Password of the export file', { exact: true }).fill(PASSWORD);
   await other.getByRole('button', { name: 'Restore' }).click();
-  await goHome(other);
+  await openWallet(other);
   await expect(other.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
   await expect(other.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
   await fresh.close();
@@ -157,13 +160,13 @@ test('each account and each network keeps its own notes and channels; Settings k
   await card(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
   await card(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
-  await expect(card(page, 'Notes').getByText('1 unspent note')).toBeVisible();
+  await expect(page.getByText('1 unspent note', { exact: true })).toBeVisible();
 
   // A second account of the same wallet sees none of the first account's notes.
   await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
   await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
-  await goHome(page);
+  await openWallet(page);
   await page.getByLabel('Account', { exact: true }).selectOption({ index: 1 });
   await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
   await page.getByLabel('Account', { exact: true }).selectOption({ index: 0 });
@@ -197,6 +200,43 @@ test('each account and each network keeps its own notes and channels; Settings k
   await expect(relayers.getByText('https://relayer.example.com')).toHaveCount(0);
 
   await useDevNetwork(page);
-  await goHome(page);
+  await openWallet(page);
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+});
+
+test('the app opens on Channels; the phrase warning is one banner that stays closed once closed, and stays on forms that take a phrase', async ({ page }) => {
+  const notice = 'Occulta only ever asks for your recovery phrase when you import a wallet. Never type it anywhere else.';
+  await page.goto('/');
+  await expect(page.getByText(notice)).toHaveCount(0); // not on the welcome screen
+  await page.getByRole('button', { name: 'Import a recovery phrase or private key' }).click();
+  await expect(page.getByText(notice)).toBeVisible(); // the form that takes a phrase states it
+  await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(generatePrivateKey());
+  await setPassword(page, 'Import wallet');
+
+  // Channels first, with the product's line under the logo and what to do before opening one.
+  await expect(page.getByRole('heading', { name: 'Channels', level: 1 })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Channels' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: /Occulta Private ZK state channels on Arbitrum/ })).toBeVisible();
+  await useDevNetwork(page); // a network with a libp2p relay, so the channel list shows
+  await expect(page.getByRole('link', { name: 'deposit into your shielded balance' })).toBeVisible();
+
+  // The banner sits at the top of every page until it is closed, and then stays closed in this browser.
+  const banner = page.getByRole('note');
+  await expect(banner).toHaveText(notice);
+  await openWallet(page);
+  await expect(banner).toHaveText(notice);
+  await expect(page.getByText('Your private address inside the pool.')).toBeVisible(); // both addresses explained
+  await expect(page.getByText('Your public Arbitrum address.')).toBeVisible();
+  await banner.getByRole('button', { name: 'Close this notice' }).click();
+  await expect(page.getByRole('note')).toHaveCount(0);
+  await page.reload();
+  await unlock(page);
+  await expect(page.getByTestId('shielded-eth')).toBeVisible();
+  await expect(page.getByRole('note')).toHaveCount(0);
+
+  // A form that takes a phrase keeps the statement, whatever the banner did.
+  await page.getByRole('button', { name: 'Lock' }).click();
+  await page.getByRole('button', { name: 'Forgot the password?' }).click();
+  await page.getByLabel('I understand that imported keys and channel data will be lost', { exact: true }).check();
+  await expect(page.getByText(notice)).toBeVisible();
 });

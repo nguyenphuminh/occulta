@@ -22,8 +22,9 @@ export function SendPrivately() {
   const [token, setToken] = useState<TokenName>('eth');
   const [amount, setAmount] = useState('');
   return (
-    <Page title="Send privately" back="#/">
-      <Card title="Private transfer">
+    <Page title="Private transfer">
+      <Card title="Send to a shielded address">
+        <p className="muted small">Pays someone inside the pool from your shielded balance. Nobody else can see the amount or who paid whom. For repeated payments to the same person, a channel is faster and cheaper.</p>
         <Field label="To shielded address">
           <input value={to} spellCheck={false} placeholder="occ…" onChange={(e) => setTo(e.target.value.trim())} />
         </Field>
@@ -44,7 +45,7 @@ export function SendPrivately() {
           onDone={() => {
             setAmount('');
             refresh();
-            location.hash = '#/';
+            location.hash = '#/wallet';
           }}
         />
       </Card>

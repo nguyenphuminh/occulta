@@ -17,10 +17,10 @@ export function Deposit() {
     await occulta.pool.deposit(tokenId(token, network), parseAmount(token, amount) as bigint);
     setAmount('');
     refresh();
-    location.hash = '#/';
+    location.hash = '#/wallet';
   });
   return (
-    <Page title="Deposit" back="#/">
+    <Page title="Deposit" back="#/wallet">
       <Card title="Deposit">
         <Notice>Moves public funds of this account into the pool. The account pays the gas; USDG is approved first.</Notice>
         <TokenSelect value={token} onChange={setToken} />

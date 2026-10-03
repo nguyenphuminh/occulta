@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { isAppError, isRoundAmount, quotedFee, type RelayerPort } from '@occulta/framework';
 import { formatAmount, parseAmount, SYMBOL, type TokenName } from './amounts.ts';
-import { BackIcon, CopyIcon, Logo } from './icons.tsx';
+import { BackIcon, CloseIcon, CopyIcon, Logo } from './icons.tsx';
 
 export function errorText(err: unknown): string {
   if (isAppError(err)) return err.message;
@@ -181,14 +181,23 @@ export function Qr({ text, label }: { text: string; label: string }) {
   return src ? <img className="qr" src={src} alt={label} width={192} height={192} /> : null;
 }
 
-/** A dialog: a sheet that slides up on phones, a centred panel on wide screens. */
-/** Rendered at the end of the body, so an animated (transformed) ancestor cannot confine its backdrop. */
-export function Modal({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A dialog: a sheet that slides up on phones, a centred panel on wide screens. It is rendered at the
+ * end of the body, so an animated (transformed) ancestor cannot confine its backdrop.
+ */
+export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose?: () => void }) {
   return createPortal(
     <div className="backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <span className="grabber" aria-hidden="true" />
-        <h2>{title}</h2>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          {onClose ? (
+            <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
+              <CloseIcon />
+            </button>
+          ) : null}
+        </div>
         {children}
       </div>
     </div>,

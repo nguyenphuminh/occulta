@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { balanceOf, sideOf, type ChannelRecord, type ChannelService } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { formatAmount, parseAmount, SYMBOL, tokenId, tokenName } from '../../shared/amounts.ts';
-import { Avatar, BackIcon, SendIcon } from '../../shared/icons.tsx';
+import { Avatar, BackIcon, EditIcon, SendIcon } from '../../shared/icons.tsx';
 import { Button, ErrorNote, Modal, RelayedSubmit, useAction } from '../../shared/ui.tsx';
+import { MAX_NICKNAME, setNickname } from './nicknames.ts';
 import { STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
 /** One channel as a conversation (BRD 2.2.8–2.2.10): balances, payments either way, pay, close or dispute. */
-export function Conversation({ record, channels }: { record: ChannelRecord; channels: ChannelService }) {
+export function Conversation({ record, channels, names }: { record: ChannelRecord; channels: ChannelService; names: Record<string, string> }) {
   const { occulta, refresh } = useApp();
   const network = occulta.network();
   const token = tokenName(record.token);
@@ -16,6 +17,13 @@ export function Conversation({ record, channels }: { record: ChannelRecord; chan
   const s = record.latest.state;
   const [amount, setAmount] = useState('');
   const [disputing, setDisputing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState('');
+  const rename = useAction(async () => {
+    await setNickname(occulta, record.peer.peerId, name);
+    setRenaming(false);
+    refresh();
+  });
   const pay = useAction(async () => {
     await channels.pay(record.id, parseAmount(token, amount) as bigint);
     setAmount('');
@@ -38,10 +46,41 @@ export function Conversation({ record, channels }: { record: ChannelRecord; chan
           <BackIcon />
         </a>
         <Avatar seed={record.peer.peerId} size={40} />
-        <div className="conversation-title">
-          <strong>{peerName(record)}</strong>
-          <span className="muted small">{record.role === 'A' ? 'You opened it' : 'You were invited'}</span>
-        </div>
+        {renaming ? (
+          <form
+            className="rename"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void rename.perform();
+            }}
+          >
+            <input aria-label="Nickname" value={name} maxLength={MAX_NICKNAME} autoFocus placeholder="Nickname" onChange={(e) => setName(e.target.value)} />
+            <Button type="submit" className="primary small" busy={rename.busy}>
+              Save
+            </Button>
+            <Button className="ghost small" onClick={() => setRenaming(false)}>
+              Cancel
+            </Button>
+          </form>
+        ) : (
+          <div className="conversation-title">
+            <span className="conversation-name">
+              <h2 className="peer-name truncate">{peerName(record.peer.peerId, names)}</h2>
+              <button
+                type="button"
+                className="icon-button tiny"
+                aria-label={names[record.peer.peerId] ? 'Rename' : 'Add a nickname'}
+                onClick={() => {
+                  setName(names[record.peer.peerId] ?? '');
+                  setRenaming(true);
+                }}
+              >
+                <EditIcon />
+              </button>
+            </span>
+            <span className="muted small">{record.role === 'A' ? 'You opened it' : 'You were invited'}</span>
+          </div>
+        )}
         <span className={`pill status-${record.status}`}>{STATUS_TEXT[record.status]}</span>
       </header>
 
@@ -124,7 +163,7 @@ export function Conversation({ record, channels }: { record: ChannelRecord; chan
           <SendIcon />
         </Button>
       </div>
-      <ErrorNote error={pay.error ?? dispute.error ?? check.error} />
+      <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error} />
 
       {disputing ? (
         <Modal title="Close without the other side">

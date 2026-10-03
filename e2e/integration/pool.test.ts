@@ -1,6 +1,7 @@
 // The framework's wallet, pool and relayer services against real contracts on the dev node.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parseEther, zeroAddress } from 'viem';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { ChainAdapter } from '../../packages/framework/src/modules/chain/index.ts';
 import { shieldedAddressOf } from '../../packages/framework/src/modules/keys/index.ts';
 import type { RelayerPort } from '../../packages/framework/src/modules/relayer/index.ts';
@@ -57,12 +58,12 @@ describe('pool and relayer services on the dev node', () => {
     expect(relayer.user.pool.balances().get(usdg)).toBe(fees.usdg);
   });
 
-  it('withdraws to a never-used account of the same wallet', async () => {
-    const exit = await bob.wallet.freshAccount();
-    await bob.pool.withdraw(ETH, parseEther('0.02'), exit.address, relayer.port);
-    await bob.pool.withdraw(usdg, 10_000_000n, exit.address, relayer.port);
-    expect(await chain.publicBalance(exit.address, ETH)).toBe(parseEther('0.02'));
-    expect(await chain.publicBalance(exit.address, usdg)).toBe(10_000_000n);
+  it('withdraws to an address with no history, which needs no ETH of its own', async () => {
+    const exit = privateKeyToAccount(generatePrivateKey()).address;
+    await bob.pool.withdraw(ETH, parseEther('0.02'), exit, relayer.port);
+    await bob.pool.withdraw(usdg, 10_000_000n, exit, relayer.port);
+    expect(await chain.publicBalance(exit, ETH)).toBe(parseEther('0.02'));
+    expect(await chain.publicBalance(exit, usdg)).toBe(10_000_000n);
     expect(bob.pool.balances().get(ETH)).toBe(parseEther('0.01') - fees.eth);
     expect(bob.pool.balances().get(usdg)).toBe(15_000_000n - fees.usdg);
   });

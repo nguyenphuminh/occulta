@@ -32,14 +32,18 @@ export async function createWallet(page: Page): Promise<string> {
 /** The words of the recovery phrase on screen, in order. */
 export const phraseWords = (page: Page): Promise<string[]> => page.getByRole('list', { name: 'Recovery phrase' }).locator('.phrase-word').allTextContents();
 
-export async function goHome(page: Page): Promise<void> {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
+export async function openWallet(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My wallet' }).click();
 }
 
-/** Opens one of the home screen's actions: Deposit, Send, Withdraw, Receive or Send publicly. */
-export async function openAction(page: Page, name: 'Deposit' | 'Send' | 'Withdraw' | 'Receive' | 'Send publicly'): Promise<void> {
-  await goHome(page);
-  await page.getByRole('link', { name, exact: true }).click();
+/** Opens one of the shielded balance's actions on My wallet; Send leads to the Private transfer page. */
+export async function openAction(page: Page, name: 'Deposit' | 'Withdraw' | 'Receive' | 'Send'): Promise<void> {
+  await openWallet(page);
+  await page.getByRole('navigation', { name: 'Shielded actions' }).getByRole('link', { name, exact: true }).click();
+}
+
+export async function openTransfer(page: Page): Promise<void> {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Private transfer' }).click();
 }
 
 export async function openSettings(page: Page): Promise<void> {
@@ -59,6 +63,9 @@ export async function openChannel(page: Page): Promise<Locator> {
 
 /** The conversation currently shown. */
 export const channelView = (page: Page): Locator => page.getByRole('region', { name: 'Channel', exact: true });
+
+/** The Open a channel dialog, from an invite link or from the Channels page. */
+export const openDialog = (page: Page): Locator => page.getByRole('dialog', { name: 'Open a channel' });
 
 export async function setPassword(page: Page, submit: string): Promise<void> {
   await page.getByLabel('Wallet password', { exact: true }).fill(PASSWORD);
@@ -84,7 +91,7 @@ export function devSend<T>(send: () => Promise<T>): Promise<T> {
 
 /** Sends test ETH (and optionally test USDG) to the active account's public address and returns it. */
 export async function fundPublicly(page: Page, eth: string, usdg?: string): Promise<Address> {
-  await goHome(page);
+  await openWallet(page);
   const address = (await page.getByTestId('public-address').textContent()) as Address;
   await devSend(async () =>
     client.waitForTransactionReceipt({ hash: await dev.sendTransaction({ account: dev.account!, chain: devChain, to: address, value: parseEther(eth) }) }),
@@ -139,13 +146,19 @@ export async function profiled<T>(page: Page, run: () => Promise<T>): Promise<T>
   }
 }
 
-/** Creates an invite on the Channels page and returns its link (it also waits until the wallet is reachable). */
+/**
+ * Opens the invite dialog on the Channels page, which makes the invite at once, and returns its link
+ * (it also waits until the wallet is reachable). The dialog is closed again.
+ */
 export async function createInvite(page: Page): Promise<string> {
   await openChannels(page);
   await page.getByRole('link', { name: 'Invite', exact: true }).click();
-  await card(page, 'Invite someone').getByRole('button', { name: 'Create invite' }).click();
-  const link = (await page.getByTestId('invite-link').textContent()) as string;
+  const dialog = page.getByRole('dialog', { name: 'Invite someone' });
+  await expect(dialog.getByRole('img', { name: 'Invite QR code' })).toBeVisible();
+  const link = (await dialog.getByTestId('invite-link').textContent()) as string;
   expect(link).toMatch(/\/#\/invite\/[A-Za-z0-9_-]+$/);
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
   return link;
 }
 

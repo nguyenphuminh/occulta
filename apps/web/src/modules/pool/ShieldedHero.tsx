@@ -16,7 +16,7 @@ export function ShieldedHero() {
     <section className="hero-card" aria-label="Shielded balance">
       <div className="hero-card-top">
         <span className="eyebrow">
-          <ShieldIcon /> Shielded balance
+          <ShieldIcon /> Shielded balance · private
         </span>
         <Button className="ghost small on-dark" busy={sync.busy} onClick={() => void sync.perform()}>
           Sync now
@@ -34,9 +34,9 @@ export function ShieldedHero() {
       <ErrorNote error={sync.error} />
       <nav className="actions" aria-label="Shielded actions">
         <ActionLink href="#/deposit" icon={<DepositIcon />} label="Deposit" />
-        <ActionLink href="#/send" icon={<SendIcon />} label="Send" />
         <ActionLink href="#/withdraw" icon={<WithdrawIcon />} label="Withdraw" />
         <ActionLink href="#/receive" icon={<ReceiveIcon />} label="Receive" />
+        <ActionLink href="#/send" icon={<SendIcon />} label="Send" />
       </nav>
     </section>
   );

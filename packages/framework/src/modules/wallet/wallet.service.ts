@@ -158,13 +158,6 @@ export class WalletService {
     return privateKeyToAccount(key);
   }
 
-  /** BRD 2.2.14.4: a never-used account of this wallet, created if needed, as a fresh exit address. */
-  async freshAccount(): Promise<Account> {
-    const doc = this.unlocked();
-    const unused = doc.accounts.find((a) => !a.used && a.id !== doc.activeAccountId);
-    return unused ?? this.addAccount();
-  }
-
   async markUsed(accountId: string): Promise<void> {
     const doc = this.unlocked();
     const account = this.accountById(accountId, doc);

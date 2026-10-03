@@ -10,7 +10,7 @@ import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.
 import { channelNullifierOf } from '../../packages/framework/src/shared/protocol/index.ts';
 import { mineBlock } from '../integration/chain.ts';
 import { newChannelNode, newUser, type ChannelNode } from '../integration/services.ts';
-import { card, createInvite, createWallet, devSend, fundPublicly, goHome, openAction, openChannel, unlock, useDevNetwork } from './helpers.ts';
+import { card, createInvite, createWallet, devSend, fundPublicly, openWallet, openAction, openChannel, unlock, useDevNetwork } from './helpers.ts';
 
 const WINDOW = 20n;
 const ETH = 0n;
@@ -65,7 +65,7 @@ test('scenario B: the open wallet answers an old state, finalizes after the dead
 
   await passDeadline();
   await expect(channel).toContainText('Settled', { timeout: 120_000 });
-  await goHome(bob);
+  await openWallet(bob);
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.01 ETH');
   expect(await alice.disputes.tick(relayer)).toEqual([]);
   expect(alice.channels.get(opened.id).status).toBe('settled');
@@ -102,7 +102,7 @@ test('scenario C: a wallet closed for the whole window reclaims its contribution
   await bob.goto('/');
   await unlock(bob);
   await expect(await openChannel(bob)).toContainText('Settled', { timeout: 120_000 });
-  await goHome(bob);
+  await openWallet(bob);
   // 0.1 − 0.01 contribution − 0.0001 funding fee + (0.01 − 0.0001 reclaim fee)
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.0998 ETH');
 });

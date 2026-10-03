@@ -4,11 +4,12 @@ import { formatAmount, tokenName } from '../../shared/amounts.ts';
 import { Avatar, ChannelsIcon, LinkIcon, PlusIcon } from '../../shared/icons.tsx';
 import { Notice, Page } from '../../shared/ui.tsx';
 import { Conversation } from './Conversation.tsx';
-import { InvitePanel, OpenPanel } from './Panels.tsx';
+import { nicknames } from './nicknames.ts';
+import { InviteDialog, OpenDialog } from './Panels.tsx';
 import { STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
-/** What the channels screen shows next to the list. */
+/** What the channels screen shows: the list alone, a channel beside it, or a dialog over it. */
 export type ChannelsView = { kind: 'none' } | { kind: 'channel'; id: string } | { kind: 'invite' } | { kind: 'open'; invite: string };
 
 function lastLine(channels: ChannelService, id: string): string {
@@ -21,7 +22,7 @@ function lastLine(channels: ChannelService, id: string): string {
   return entry.text;
 }
 
-/** BRD 2.2.6–2.2.10 on the website: channels as conversations, with invites and opening. */
+/** BRD 2.2.6–2.2.10 on the website: channels as conversations, the product's main screen. */
 export function ChannelsPage({ view }: { view: ChannelsView }) {
   const { occulta, version } = useApp();
   let channels: ChannelService;
@@ -37,11 +38,13 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
     }
     throw err;
   }
+  const names = nicknames(occulta);
   const list = [...channels.list()].reverse();
   const selected = view.kind === 'channel' ? list.find((r) => r.id === view.id) : undefined;
+  const hasFunds = [...occulta.pool.balances().values()].some((v) => v > 0n);
   return (
-    <div className={view.kind === 'none' ? 'channels' : 'channels has-detail'} data-version={version}>
-      <aside className="channel-list" aria-label="Your channels">
+    <div className={view.kind === 'channel' ? 'channels has-detail' : 'channels'} data-version={version}>
+      <section className="channel-list" aria-label="Your channels">
         <header className="page-head">
           <h1>Channels</h1>
           <div className="page-actions">
@@ -57,7 +60,12 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
           <div className="empty">
             <ChannelsIcon />
             <p>No channels yet.</p>
-            <p className="muted small">Create an invite and share it, or open a channel with someone else&apos;s invite.</p>
+            <p className="muted small">Share your invite so someone can open a channel with you, or open one with their invite. Payments in a channel are instant and private.</p>
+            {hasFunds ? null : (
+              <p className="small">
+                To fund a channel you open, first <a href="#/deposit">deposit into your shielded balance</a>.
+              </p>
+            )}
           </div>
         ) : (
           <ul className="channel-items">
@@ -69,7 +77,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
                     <Avatar seed={r.peer.peerId} />
                     <span className="channel-item-main">
                       <span className="channel-item-top">
-                        <strong>{peerName(r)}</strong>
+                        <strong className="truncate">{peerName(r.peer.peerId, names)}</strong>
                         <span className="muted small">{formatAmount(token, balanceOf(r.latest.state, sideOf(r)))}</span>
                       </span>
                       <span className="channel-item-bottom">
@@ -83,21 +91,21 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
             })}
           </ul>
         )}
-      </aside>
-      <div className="channel-detail">
-        {view.kind === 'invite' ? (
-          <InvitePanel />
-        ) : view.kind === 'open' ? (
-          <OpenPanel key={view.invite} initialInvite={view.invite} />
-        ) : selected ? (
-          <Conversation record={selected} channels={channels} />
-        ) : (
-          <div className="empty wide">
-            <ChannelsIcon />
-            <p>{view.kind === 'channel' ? 'This channel is not in this account on this network.' : 'Select a channel to see its payments.'}</p>
-          </div>
-        )}
-      </div>
+      </section>
+      {view.kind === 'channel' ? (
+        <div className="channel-detail">
+          {selected ? (
+            <Conversation key={selected.id} record={selected} channels={channels} names={names} />
+          ) : (
+            <div className="empty wide">
+              <ChannelsIcon />
+              <p>This channel is not in this account on this network.</p>
+            </div>
+          )}
+        </div>
+      ) : null}
+      {view.kind === 'invite' ? <InviteDialog /> : null}
+      {view.kind === 'open' ? <OpenDialog key={view.invite} initialInvite={view.invite} /> : null}
     </div>
   );
 }

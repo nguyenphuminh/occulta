@@ -94,13 +94,9 @@ describe('wallet', () => {
     expect(wallet.activeAccount().id).toBe(first.id);
   });
 
-  it('starts on Arbitrum Sepolia and offers a never-used account as an exit address', async () => {
-    const first = await wallet.createFromPhrase(PHRASE, PASSWORD);
+  it('starts on Arbitrum Sepolia', async () => {
+    await wallet.createFromPhrase(PHRASE, PASSWORD);
     expect(wallet.networkId()).toBe('arbitrum-sepolia');
-    const fresh = await wallet.freshAccount();
-    expect(fresh.id).not.toBe(first.id);
-    await wallet.markUsed(fresh.id);
-    expect((await wallet.freshAccount()).id).not.toBe(fresh.id);
   });
 
   it('exports one encrypted file that restores everything in a fresh store', async () => {
