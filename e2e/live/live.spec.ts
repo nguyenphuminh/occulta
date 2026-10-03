@@ -48,6 +48,10 @@ test('the website, its proving files and the relayer answer', async ({ request }
   const home = await request.get('/');
   expect(home.ok()).toBe(true);
   expect(await home.text()).toContain('<div id="root">');
+  expect(await home.text()).toContain('<title>Occulta State Channel</title>');
+  const icon = await request.get('/favicon.svg');
+  expect(icon.ok()).toBe(true);
+  expect(await icon.text()).toContain('<svg');
   // The same proving file the build was made with (Cloudflare does not give its length for a HEAD).
   const zkey = await request.get('/artifacts/transfer.zkey');
   expect(zkey.ok()).toBe(true);
