@@ -38,6 +38,9 @@ export class ChainAdapter {
   readonly network: NetworkConfig;
   readonly chain: Chain;
   readonly client: PublicClient;
+  /** Every dispute seen in the contract's events, scanned up to `scannedTo`. */
+  private readonly disputeMirror = { scannedTo: -1n, disputes: new Map<bigint, Dispute>(), finalized: new Set<bigint>() };
+  private mirroring: Promise<void> | null = null;
 
   constructor(network: NetworkConfig) {
     this.network = network;
@@ -87,31 +90,53 @@ export class ChainAdapter {
     return events.map((e) => e.args.nullifier as bigint);
   }
 
-  /** Channel nullifiers of disputes started in a block range (to notice disputes on our channels). */
-  async disputeEvents(fromBlock: bigint, toBlock: bigint): Promise<{ channelNullifier: bigint; nonce: bigint; deadline: bigint }[]> {
-    const { disputes } = this.contracts();
-    const events = await this.windows(fromBlock, toBlock, (from, to) =>
-      this.client.getContractEvents({ address: disputes, abi: disputesAbi, eventName: 'DisputeSubmitted', fromBlock: from, toBlock: to }),
-    );
-    return events.map((e) => ({ channelNullifier: e.args.channelNullifier as bigint, nonce: e.args.nonce as bigint, deadline: e.args.deadline as bigint }));
+  /**
+   * Catches up with every dispute the contract has seen, from its events. Asking the contract about
+   * one channel would tell the RPC provider which channel nullifiers belong to this user (BRD 2.2.4).
+   */
+  private refreshDisputes(): Promise<void> {
+    this.mirroring ??= this.scanDisputes().finally(() => {
+      this.mirroring = null;
+    });
+    return this.mirroring;
+  }
+
+  private async scanDisputes(): Promise<void> {
+    const { disputes, deployBlock } = this.contracts();
+    const mirror = this.disputeMirror;
+    const to = await this.latestBlock();
+    const from = mirror.scannedTo < 0n ? deployBlock : mirror.scannedTo + 1n;
+    if (from > to) return;
+    const [submitted, finalized] = await Promise.all([
+      this.windows(from, to, (f, t) => this.client.getContractEvents({ address: disputes, abi: disputesAbi, eventName: 'DisputeSubmitted', fromBlock: f, toBlock: t })),
+      this.windows(from, to, (f, t) => this.client.getContractEvents({ address: disputes, abi: disputesAbi, eventName: 'ChannelFinalized', fromBlock: f, toBlock: t })),
+    ]);
+    // In chain order, so the latest submission for a channel wins; a finalized dispute is no longer pending.
+    for (const e of submitted) {
+      mirror.disputes.set(e.args.channelNullifier as bigint, { pending: true, nonce: e.args.nonce as bigint, stateHash: e.args.stateHash as bigint, deadline: e.args.deadline as bigint });
+    }
+    for (const e of finalized) {
+      const channelNullifier = e.args.channelNullifier as bigint;
+      mirror.finalized.add(channelNullifier);
+      const dispute = mirror.disputes.get(channelNullifier);
+      if (dispute) mirror.disputes.set(channelNullifier, { ...dispute, pending: false });
+    }
+    mirror.scannedTo = to;
   }
 
   async isKnownRoot(root: bigint): Promise<boolean> {
     return this.client.readContract({ address: this.contracts().pool, abi: poolAbi, functionName: 'isKnownRoot', args: [root] });
   }
 
+  /** The channel's dispute as the contract holds it: the latest submitted state and its deadline. */
   async disputeOf(channelNullifier: bigint): Promise<Dispute> {
-    const [pending, nonce, stateHash, deadline] = await this.client.readContract({
-      address: this.contracts().disputes,
-      abi: disputesAbi,
-      functionName: 'disputeOf',
-      args: [channelNullifier],
-    });
-    return { pending, nonce, stateHash, deadline };
+    await this.refreshDisputes();
+    return this.disputeMirror.disputes.get(channelNullifier) ?? { pending: false, nonce: 0n, stateHash: 0n, deadline: 0n };
   }
 
   async isFinalized(channelNullifier: bigint): Promise<boolean> {
-    return this.client.readContract({ address: this.contracts().disputes, abi: disputesAbi, functionName: 'isFinalized', args: [channelNullifier] });
+    await this.refreshDisputes();
+    return this.disputeMirror.finalized.has(channelNullifier);
   }
 
   /** Shortest and longest dispute window the deployed contract accepts, in seconds. */

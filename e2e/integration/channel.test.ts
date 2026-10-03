@@ -1,6 +1,6 @@
 // Channels between wallets over libp2p (through a relay) against real contracts on the dev node:
 // opening, off-chain payments, the tie-breaker, cooperative close and the three dispute scenarios.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Libp2p } from '@libp2p/interface';
 import { parseEther } from 'viem';
 import { createRelayNode } from '../../packages/framework/src/libp2p.node.ts';
@@ -9,7 +9,7 @@ import { balanceOf, hashOf, sideOf, type ChannelRecord } from '../../packages/fr
 import { channelSecrets, shieldedAddressOf } from '../../packages/framework/src/modules/keys/index.ts';
 import type { RelayRequest, RelayerPort } from '../../packages/framework/src/modules/relayer/index.ts';
 import { AppError } from '../../packages/framework/src/shared/errors/AppError.ts';
-import { signStateHash } from '../../packages/framework/src/shared/protocol/index.ts';
+import { channelNullifierOf, signStateHash } from '../../packages/framework/src/shared/protocol/index.ts';
 import { freshDeployment, mineBlock } from './chain.ts';
 import { devNetwork, newChannelNode, newRelayer, newUser, type ChannelNode, type User } from './services.ts';
 
@@ -244,6 +244,35 @@ describe('channels on the dev node', () => {
       expect(mine(b.channels.get(id))).toBe(parseEther('0.03'));
     });
 
+    it('watches its channels for disputes without ever naming one to the RPC provider (BRD 2.2.4)', async () => {
+      const window = 10n;
+      const id = await openLive(window);
+      const named = channelNullifierOf(a.channels.get(id).params.channelSecret).toString();
+      /** Every chain read the wallets make while `watch` runs, with its arguments. */
+      const asked = async (watch: () => Promise<unknown>): Promise<string> => {
+        const client = chain.client as unknown as Record<string, (...args: unknown[]) => unknown>;
+        const spies = ['readContract', 'getContractEvents', 'getLogs', 'getBlockNumber', 'getBlock', 'call'].map((method) => vi.spyOn(client, method));
+        let calls: unknown[][];
+        try {
+          await watch();
+        } finally {
+          calls = spies.flatMap((spy) => spy.mock.calls);
+          for (const spy of spies) spy.mockRestore();
+        }
+        expect(calls.length).toBeGreaterThan(0);
+        return JSON.stringify(calls, (_, v: unknown) => (typeof v === 'bigint' ? v.toString() : v));
+      };
+      const watchBoth = () => Promise.all([a.disputes.tick(relayer.port), b.disputes.tick(relayer.port), a.channels.tick(relayer.port), b.channels.tick(relayer.port)]);
+
+      expect(await asked(watchBoth)).not.toContain(named); // no dispute yet
+      await b.disputes.start(id, relayer.port); // the submission itself names it, through the relayer
+      expect(await asked(watchBoth)).not.toContain(named); // a pending dispute, noticed from the contract's events
+      expect([a.channels.get(id).status, b.channels.get(id).status]).toEqual(['disputing', 'disputing']);
+      await passDeadline(window);
+      expect(await b.disputes.tick(relayer.port)).toEqual([]);
+      expect(await a.disputes.tick(relayer.port)).toEqual([]);
+      expect([a.channels.get(id).status, b.channels.get(id).status]).toEqual(['settled', 'settled']);
+    });
   });
 
   describe('an opening whose funding fails (BRD 2.2.7)', () => {
