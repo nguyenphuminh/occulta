@@ -82,8 +82,10 @@ export class DisputeService {
     const { wallet, channels } = this.deps;
     const account = accountId ?? wallet.activeAccount().id;
     const problems: TickProblem[] = [];
-    for (const { id, status } of channels.list(account)) {
-      if (!WATCHED.has(status)) continue;
+    const watched = channels.list(account).filter((r) => WATCHED.has(r.status));
+    // Catch up with the contract's events first, so that no channel stays locked while they download.
+    if (watched.length > 0) await this.deps.chain.refreshDisputes();
+    for (const { id } of watched) {
       try {
         await channels.update(id, (r) => this.advance(r, relayer, account), account);
       } catch (error) {

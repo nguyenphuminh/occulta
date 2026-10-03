@@ -1,3 +1,4 @@
+import { AppError } from '../../shared/errors/AppError.ts';
 import type { WalletService } from '../wallet/index.ts';
 import { PoolSectionSchema, type PoolSection } from './pool.schema.ts';
 
@@ -21,6 +22,7 @@ const toJson = (s: PoolSection) => ({
 export class PoolRepository {
   private readonly wallet: WalletService;
   private readonly networkId: string | undefined;
+  private closed = false;
 
   constructor(wallet: WalletService, networkId?: string) {
     this.wallet = wallet;
@@ -31,7 +33,16 @@ export class PoolRepository {
     return this.wallet.readSection(SECTION, PoolSectionSchema, accountId, this.networkId) ?? { syncedBlock: -1n, notes: [] };
   }
 
-  save(section: PoolSection, accountId?: string): Promise<void> {
-    return this.wallet.writeSection(SECTION, toJson(section), accountId, this.networkId);
+  /**
+   * Called when the session using it stops (lock, or a switch of account or network): work still
+   * running in that session must not overwrite what the next session saves.
+   */
+  close(): void {
+    this.closed = true;
+  }
+
+  async save(section: PoolSection, accountId?: string): Promise<void> {
+    if (this.closed) throw new AppError(409, 'SESSION_STOPPED', 'This session has stopped; its changes are not saved');
+    await this.wallet.writeSection(SECTION, toJson(section), accountId, this.networkId);
   }
 }

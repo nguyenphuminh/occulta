@@ -49,6 +49,8 @@ interface Session {
   p2p: P2PService | null;
   channels: ChannelService | null;
   disputes: DisputeService | null;
+  /** Closed when the session ends, so its unfinished work cannot overwrite the next session's data. */
+  stores: { close(): void }[];
 }
 
 /**
@@ -99,13 +101,16 @@ export class Occulta {
     const accountId = wallet.activeAccount().id;
     const network = this.network();
     const chain = new ChainAdapter(network);
-    const pool = new PoolService({ wallet, keys, chain, prover, repository: new PoolRepository(wallet, network.id) });
-    const session: Session = { accountId, network, chain, pool, p2p: null, channels: null, disputes: null };
+    const poolStore = new PoolRepository(wallet, network.id);
+    const pool = new PoolService({ wallet, keys, chain, prover, repository: poolStore });
+    const session: Session = { accountId, network, chain, pool, p2p: null, channels: null, disputes: null, stores: [poolStore] };
     const relays = options.libp2pRelays ?? network.libp2pRelays;
     if (relays.length > 0) {
       // A stable libp2p identity per account, so invites keep working across restarts.
       const seed = hexToBytes(keccak256(concat([(await keys.poolKeys(accountId)).seed, stringToHex('libp2p')])));
       const p2p = new P2PService(await options.createNode({ relays, seed }));
+      const channelStore = new ChannelRepository(wallet, network.id);
+      session.stores.push(channelStore);
       const channels = new ChannelService({
         wallet,
         keys,
@@ -113,7 +118,7 @@ export class Occulta {
         pool,
         prover,
         p2p,
-        repository: new ChannelRepository(wallet, network.id),
+        repository: channelStore,
         approveOpen: options.approveOpen,
         onJoined: options.onJoined,
         confirmPayment: options.confirmPayment,
@@ -122,12 +127,15 @@ export class Occulta {
       await channels.listen();
       Object.assign(session, { p2p, channels, disputes: new DisputeService({ wallet, keys, chain, pool, prover, channels }) });
     }
+    const previous = this.session;
     this.session = session;
+    for (const store of previous?.stores ?? []) store.close();
   }
 
   async stop(): Promise<void> {
     const session = this.session;
     this.session = null;
+    for (const store of session?.stores ?? []) store.close();
     await session?.p2p?.stop();
   }
 

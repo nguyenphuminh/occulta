@@ -94,7 +94,7 @@ export class ChainAdapter {
    * Catches up with every dispute the contract has seen, from its events. Asking the contract about
    * one channel would tell the RPC provider which channel nullifiers belong to this user (BRD 2.2.4).
    */
-  private refreshDisputes(): Promise<void> {
+  refreshDisputes(): Promise<void> {
     this.mirroring ??= this.scanDisputes().finally(() => {
       this.mirroring = null;
     });
