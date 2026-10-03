@@ -10,7 +10,7 @@ describe('PoolRepository', () => {
     const wallet = new WalletService(new WalletRepository(new MemoryStore()), { N: 2 ** 10, r: 8, p: 1 });
     const first = await wallet.createFromPhrase(generateMnemonic(wordlist, 128), 'password123');
     const repository = new PoolRepository(wallet, 'arbitrum-sepolia');
-    await wallet.setNetwork('robinhood-testnet');
+    await wallet.setNetwork('other-network');
     const second = await wallet.addAccount();
     await wallet.setActiveAccount(second.id);
 

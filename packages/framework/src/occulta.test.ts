@@ -2,6 +2,7 @@ import { zeroAddress } from 'viem';
 import { describe, expect, it } from 'vitest';
 import { generateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
+import { BUILT_IN_NETWORKS } from './modules/chain/index.ts';
 import type { RelayerPort } from './modules/relayer/index.ts';
 import { MemoryStore } from './modules/storage/index.ts';
 import { Occulta, type OccultaOptions } from './occulta.ts';
@@ -39,9 +40,10 @@ describe('Occulta facade', () => {
     expect(() => occulta.channels).toThrow(/libp2p relay/);
   });
 
-  it('switches to another built-in network and rejects an unknown one', async () => {
-    const occulta = await node();
-    await occulta.wallet.setNetwork('robinhood-testnet');
+  it('switches to another configured network and rejects an unknown one', async () => {
+    const other = { ...(BUILT_IN_NETWORKS[0] as (typeof BUILT_IN_NETWORKS)[number]), id: 'other', chainId: 46630 };
+    const occulta = await node({ networks: [...BUILT_IN_NETWORKS, other] });
+    await occulta.wallet.setNetwork('other');
     await occulta.start();
     expect(occulta.chain.network.chainId).toBe(46630);
     await occulta.wallet.setNetwork('nowhere');

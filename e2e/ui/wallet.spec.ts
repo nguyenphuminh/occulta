@@ -174,8 +174,8 @@ test('each account and each network keeps its own notes and channels; Settings k
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
 
   // Another network neither, and Occulta tells where it is not deployed.
-  await page.getByLabel('Network', { exact: true }).selectOption('arbitrum-one');
-  await expect(page.getByText('Occulta is not deployed on Arbitrum One yet.')).toBeVisible();
+  await page.getByLabel('Network', { exact: true }).selectOption('dev-undeployed');
+  await expect(page.getByText('Occulta is not deployed on Second dev chain yet.')).toBeVisible();
   await expect(page.getByTestId('shielded-eth')).toHaveText('0 ETH');
   await openChannels(page);
   await expect(page.getByText('Channels need a libp2p relay. Add one in Settings for this network.')).toBeVisible();
@@ -183,8 +183,8 @@ test('each account and each network keeps its own notes and channels; Settings k
   // Relayers and relays added in Settings stay, also after locking, and can be removed.
   const relay = devNetworkInfo().libp2pRelays[0] as string;
   await openSettings(page, 'Network');
-  const relayers = card(page, 'Transaction relayers on Arbitrum One');
-  const relays = card(page, 'libp2p relays on Arbitrum One');
+  const relayers = card(page, 'Transaction relayers on Second dev chain');
+  const relays = card(page, 'libp2p relays on Second dev chain');
   await relayers.getByLabel('Add', { exact: true }).fill('https://relayer.example.com');
   await relayers.getByRole('button', { name: 'Add' }).click();
   await relays.getByLabel('Add', { exact: true }).fill(relay);

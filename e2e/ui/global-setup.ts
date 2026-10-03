@@ -63,7 +63,9 @@ export default async function setup(): Promise<() => Promise<void>> {
 
   // The website, built with the dev network (its relayer and relay are the desktop client's).
   const webNetwork = { ...network, contracts: { ...network.contracts, deployBlock: String(deployment.deployBlock) }, relayers: [desktop.ready.relayer], libp2pRelays: desktop.ready.libp2pRelay };
-  process.env.VITE_OCCULTA_DEV_NETWORK = JSON.stringify(webNetwork);
+  // A second chain where Occulta is not deployed and no relay is known (the built-in network has both).
+  const undeployed = { ...webNetwork, id: 'dev-undeployed', name: 'Second dev chain', contracts: undefined, relayers: [], libp2pRelays: [] };
+  process.env.VITE_OCCULTA_DEV_NETWORK = JSON.stringify([webNetwork, undeployed]);
   process.env.VITE_OCCULTA_TICK_MS = '1500';
   const root = join(REPO, 'apps/web');
   // OCCULTA_UI_PROFILE keeps function names readable in CPU profiles.

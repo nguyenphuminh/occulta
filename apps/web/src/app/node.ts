@@ -7,10 +7,10 @@ import { WorkerProver } from './worker-prover.ts';
 /** How long a peer waits for an answer before its channel proposal fails (the P2P request timeout is 60 s). */
 const APPROVAL_TIMEOUT_MS = 50_000;
 
-/** An extra chain given to the dev server, e.g. the local dev node in UI tests. Absent in normal builds. */
+/** Extra chains given to the dev server (one or a list), e.g. the local dev node in UI tests. Absent in normal builds. */
 function devNetworks(): NetworkConfig[] {
   const raw = import.meta.env.VITE_OCCULTA_DEV_NETWORK as string | undefined;
-  return raw ? [NetworkConfigSchema.parse(JSON.parse(raw))] : [];
+  return raw ? [JSON.parse(raw) as unknown].flat().map((n) => NetworkConfigSchema.parse(n)) : [];
 }
 
 /** The website's composition root: the framework node with the browser's storage, proving files and libp2p. */

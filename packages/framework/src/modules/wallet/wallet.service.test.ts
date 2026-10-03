@@ -86,7 +86,7 @@ describe('wallet', () => {
     const schema = z.object({ n: z.number() });
     await wallet.writeSection('notes', { n: 1 });
     await wallet.writeSection('notes', { n: 2 }, second.id);
-    await wallet.setNetwork('robinhood-testnet');
+    await wallet.setNetwork('other-network');
     expect(wallet.readSection('notes', schema)).toBeUndefined();
     await wallet.setNetwork('arbitrum-sepolia');
     expect(wallet.readSection('notes', schema)).toEqual({ n: 1 });

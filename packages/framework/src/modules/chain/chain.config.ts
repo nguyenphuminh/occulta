@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/) as z.ZodType<`0x${string}`>;
 
-/** A chain configuration: one of the four built-in ones, or a custom one (BRD 2.2.13). */
+/** A chain configuration: the built-in one (Arbitrum Sepolia), or a custom one (BRD 2.2.13). */
 export const NetworkConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -27,18 +27,8 @@ export const NetworkConfigSchema = z.object({
 
 export type NetworkConfig = z.infer<typeof NetworkConfigSchema>;
 
-/** USDG addresses from Paxos's documentation (docs.paxos.com/guides/stablecoin/usdg). */
+/** Occulta runs on Arbitrum Sepolia only. USDG address from Paxos's documentation (docs.paxos.com/guides/stablecoin/usdg). */
 export const BUILT_IN_NETWORKS: readonly NetworkConfig[] = [
-  {
-    id: 'arbitrum-one',
-    name: 'Arbitrum One',
-    chainId: 42161,
-    rpcUrl: 'https://arb1.arbitrum.io/rpc',
-    explorerUrl: 'https://arbiscan.io',
-    usdg: '0x004B506865409877C9fA29bfb1ebA929984B9bbC',
-    relayers: [],
-    libp2pRelays: [],
-  },
   {
     id: 'arbitrum-sepolia',
     name: 'Arbitrum Sepolia',
@@ -51,25 +41,5 @@ export const BUILT_IN_NETWORKS: readonly NetworkConfig[] = [
     // The live relay host (npm run deploy:live): one desktop client as both relayer and libp2p relay.
     relayers: ['https://relay.occulta.space'],
     libp2pRelays: ['/dns4/relay.occulta.space/tcp/443/wss/p2p/12D3KooWExZXWgpmX2sTEGGKNMniT7aMirRHAH2wnoMZVt1Y6ue3'],
-  },
-  {
-    id: 'robinhood-mainnet',
-    name: 'Robinhood Chain',
-    chainId: 4663,
-    rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
-    explorerUrl: 'https://robinhoodchain.blockscout.com',
-    usdg: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-    relayers: [],
-    libp2pRelays: [],
-  },
-  {
-    id: 'robinhood-testnet',
-    name: 'Robinhood Chain Testnet',
-    chainId: 46630,
-    rpcUrl: 'https://rpc.testnet.chain.robinhood.com',
-    explorerUrl: 'https://explorer.testnet.chain.robinhood.com',
-    usdg: '0x7E955252E15c84f5768B83c41a71F9eba181802F',
-    relayers: [],
-    libp2pRelays: [],
   },
 ];

@@ -10,7 +10,7 @@ describe('amounts typed by the user', () => {
   });
 
   it('formats base units with the symbol and maps tokens per network', () => {
-    const sepolia = BUILT_IN_NETWORKS[1]!;
+    const sepolia = BUILT_IN_NETWORKS[0]!;
     expect(formatAmount('eth', 1500000000000000000n)).toBe('1.5 ETH');
     expect(tokenId('usdg', sepolia)).toBe(BigInt(sepolia.usdg));
     expect(tokenName(0n)).toBe('eth');

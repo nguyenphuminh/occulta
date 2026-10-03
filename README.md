@@ -58,7 +58,7 @@ node apps/desktop/src/main.ts start --relayer --relayer-account <unused account>
 
 A custom chain (e.g. the dev node) is passed with `--network-file <json> --network <id>`, in the
 format of the built-in configurations in `packages/framework/src/modules/chain/chain.config.ts`.
-The website gets one through `VITE_OCCULTA_DEV_NETWORK` (the same JSON) when it is started with
+The website gets them through `VITE_OCCULTA_DEV_NETWORK` (the same JSON, or a list of them) when it is started with
 `npm run dev -w @occulta/web`. Browsers on an `https` page can only reach `wss://` relays, so a public
 libp2p relay needs TLS in front of it.
 
@@ -85,10 +85,10 @@ a single contribution made by the team in `circuits/scripts/build.ts` with fresh
 who kept that entropy could forge proofs, so this setup is for testing and the hackathon only; a
 production deployment needs a multi-party phase-2 ceremony.
 
-## Deploying to public networks
+## Deploying to Arbitrum Sepolia
 
-Arbitrum Sepolia is deployed (production build, 3–7 day dispute window), and its built-in
-configuration points at it:
+Occulta runs on Arbitrum Sepolia only, its one built-in network. It is deployed (production build,
+3–7 day dispute window), and its built-in configuration points at it:
 
 | Contract | Arbitrum Sepolia |
 |---|---|
@@ -98,8 +98,8 @@ configuration points at it:
 | Poseidon hasher | `0x154052BAD5D2D3c79d31FDF731E46586144646F2` |
 
 It lists the live relay host below (`https://relay.occulta.space`, one desktop client that is both
-transaction relayer and libp2p relay); users can add their own in the website's settings. Arbitrum
-One and the Robinhood chains are not deployed yet. Deploying needs a funded deployer key on each chain:
+transaction relayer and libp2p relay); users can add their own in the website's settings. Deploying
+again needs a funded deployer key:
 
 ```sh
 OCCULTA_DEPLOYER_KEY=0x… npm run deploy:network -- --network arbitrum-sepolia
