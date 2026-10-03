@@ -3,10 +3,11 @@ import { useApp } from '../../app/context.ts';
 import { formatAmount, tokenName } from '../../shared/amounts.ts';
 import { Avatar, ChannelsIcon, LinkIcon, PlusIcon } from '../../shared/icons.tsx';
 import { Notice, Page } from '../../shared/ui.tsx';
-import { Conversation } from './Conversation.tsx';
+import { Conversation, PendingConversation } from './Conversation.tsx';
 import { nicknames } from './nicknames.ts';
 import { InviteDialog, OpenDialog } from './Panels.tsx';
-import { STATUS_TEXT, peerName } from './status.ts';
+import type { PendingOpen } from './pendingOpens.ts';
+import { PENDING_TEXT, STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
 /** What the channels screen shows: the list alone, a channel beside it, or a dialog over it. */
@@ -22,12 +23,50 @@ function lastLine(channels: ChannelService, id: string): string {
   return entry.text;
 }
 
+function pendingLine(p: PendingOpen): string {
+  if (p.state === 'declined') return 'Declined, or no answer in time';
+  if (p.state === 'failed') return 'Could not open the channel';
+  return p.peerAmount > 0n ? 'Waiting for them to accept' : 'Reaching them…';
+}
+
+interface ItemProps {
+  id: string;
+  on: boolean;
+  peerId: string;
+  names: Record<string, string>;
+  amount: string;
+  line: string;
+  status: string;
+  statusText: string;
+}
+
+/** One row of the list: who, this side's amount, the latest line and the status. */
+function ChannelItem({ id, on, peerId, names, amount, line, status, statusText }: ItemProps) {
+  return (
+    <li>
+      <a className={on ? 'channel-item on' : 'channel-item'} href={`#/channels/${id}`} data-testid="channel-item">
+        <Avatar seed={peerId} />
+        <span className="channel-item-main">
+          <span className="channel-item-top">
+            <strong className="truncate">{peerName(peerId, names)}</strong>
+            <span className="muted small">{amount}</span>
+          </span>
+          <span className="channel-item-bottom">
+            <span className="muted small truncate">{line}</span>
+            <span className={`pill tiny status-${status}`}>{statusText}</span>
+          </span>
+        </span>
+      </a>
+    </li>
+  );
+}
+
 /**
  * BRD 2.2.6–2.2.10 on the website, laid out like a messaging app: the list of channels beside the
  * open one, both the full height of the screen; on phones the list, then the channel on its own.
  */
 export function ChannelsPage({ view }: { view: ChannelsView }) {
-  const { occulta, version } = useApp();
+  const { occulta, pendingOpens, version } = useApp();
   let channels: ChannelService;
   try {
     channels = occulta.channels;
@@ -43,7 +82,10 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
   }
   const names = nicknames(occulta);
   const list = [...channels.list()].reverse();
+  // Opens still waiting for the other side, newest first, above the channels (BRD 2.2.14.8).
+  const pending = [...pendingOpens.list(occulta.wallet.activeAccount().id, occulta.network().id)].reverse();
   const selected = view.kind === 'channel' ? list.find((r) => r.id === view.id) : undefined;
+  const selectedPending = view.kind === 'channel' ? pending.find((p) => p.id === view.id) : undefined;
   const hasFunds = [...occulta.pool.balances().values()].some((v) => v > 0n);
   return (
     <div className={view.kind === 'channel' ? 'channels has-detail' : 'channels'} data-version={version}>
@@ -59,7 +101,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
             </a>
           </div>
         </header>
-        {list.length === 0 ? (
+        {list.length === 0 && pending.length === 0 ? (
           <div className="empty">
             <ChannelsIcon />
             <p>No channels yet.</p>
@@ -72,32 +114,40 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
           </div>
         ) : (
           <ul className="channel-items">
-            {list.map((r) => {
-              const token = tokenName(r.token);
-              return (
-                <li key={r.id}>
-                  <a className={selected?.id === r.id ? 'channel-item on' : 'channel-item'} href={`#/channels/${r.id}`} data-testid="channel-item">
-                    <Avatar seed={r.peer.peerId} />
-                    <span className="channel-item-main">
-                      <span className="channel-item-top">
-                        <strong className="truncate">{peerName(r.peer.peerId, names)}</strong>
-                        <span className="muted small">{formatAmount(token, balanceOf(r.latest.state, sideOf(r)))}</span>
-                      </span>
-                      <span className="channel-item-bottom">
-                        <span className="muted small truncate">{lastLine(channels, r.id)}</span>
-                        <span className={`pill tiny status-${r.status}`}>{STATUS_TEXT[r.status]}</span>
-                      </span>
-                    </span>
-                  </a>
-                </li>
-              );
-            })}
+            {pending.map((p) => (
+              <ChannelItem
+                key={p.id}
+                id={p.id}
+                on={selectedPending?.id === p.id}
+                peerId={p.peerId}
+                names={names}
+                amount={formatAmount(tokenName(p.token), p.amount)}
+                line={pendingLine(p)}
+                status={p.state === 'waiting' ? 'pending' : p.state}
+                statusText={PENDING_TEXT[p.state]}
+              />
+            ))}
+            {list.map((r) => (
+              <ChannelItem
+                key={r.id}
+                id={r.id}
+                on={selected?.id === r.id}
+                peerId={r.peer.peerId}
+                names={names}
+                amount={formatAmount(tokenName(r.token), balanceOf(r.latest.state, sideOf(r)))}
+                line={lastLine(channels, r.id)}
+                status={r.status}
+                statusText={STATUS_TEXT[r.status]}
+              />
+            ))}
           </ul>
         )}
       </section>
       <div className="channel-detail">
         {selected ? (
           <Conversation key={selected.id} record={selected} channels={channels} names={names} />
+        ) : selectedPending ? (
+          <PendingConversation key={selectedPending.id} open={selectedPending} names={names} />
         ) : (
           <div className="chat-placeholder">
             <span className="chat-placeholder-icon">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChannelsPage, type ChannelsView } from '../modules/channels/index.ts';
+import { ChannelsPage, PendingOpens, type ChannelsView } from '../modules/channels/index.ts';
 import { MyWallet, type WalletDialog } from '../modules/home/index.ts';
 import { Onboarding, PhraseBanner, TAGLINE, Unlock } from '../modules/onboarding/index.ts';
 import { Settings, type SettingsCategory } from '../modules/settings/index.ts';
@@ -60,6 +60,7 @@ const NAV = [
 
 export function App() {
   const prompts = useMemo(() => new Prompts(), []);
+  const pendingOpens = useMemo(() => new PendingOpens(), []);
   const occulta = useMemo(() => createOcculta(prompts), [prompts]);
   const [phase, setPhase] = useState<'loading' | 'onboarding' | 'locked' | 'ready'>('loading');
   const [version, setVersion] = useState(0);
@@ -73,6 +74,8 @@ export function App() {
     return prompts.subscribe(() => setPrompt(prompts.current()));
   }, [occulta, prompts]);
 
+  useEffect(() => pendingOpens.subscribe(refresh), [pendingOpens, refresh]);
+
   const onReady = useCallback(async () => {
     await startNode(occulta);
     setPhase('ready');
@@ -80,9 +83,10 @@ export function App() {
   }, [occulta, refresh]);
 
   const lock = useCallback(async () => {
+    pendingOpens.clear();
     await occulta.lock();
     setPhase('locked');
-  }, [occulta]);
+  }, [occulta, pendingOpens]);
 
   useEffect(() => {
     if (phase !== 'ready') return;
@@ -102,7 +106,10 @@ export function App() {
     return () => clearInterval(timer);
   }, [phase, occulta, refresh]);
 
-  const context: AppContextValue | null = useMemo(() => (phase === 'ready' ? { occulta, prompts, version, refresh, lock } : null), [phase, occulta, prompts, version, refresh, lock]);
+  const context: AppContextValue | null = useMemo(
+    () => (phase === 'ready' ? { occulta, prompts, pendingOpens, version, refresh, lock } : null),
+    [phase, occulta, prompts, pendingOpens, version, refresh, lock],
+  );
 
   if (phase === 'loading') return <div className="loading" aria-busy="true" />;
   if (phase === 'onboarding') return <Onboarding occulta={occulta} onReady={onReady} />;

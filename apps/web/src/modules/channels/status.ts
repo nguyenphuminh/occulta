@@ -1,4 +1,5 @@
 import type { ChannelRecord } from '@occulta/framework';
+import type { PendingOpen } from './pendingOpens.ts';
 
 export const STATUS_TEXT: Record<ChannelRecord['status'], string> = {
   opening: 'Opening',
@@ -8,6 +9,13 @@ export const STATUS_TEXT: Record<ChannelRecord['status'], string> = {
   closed: 'Closed',
   disputing: 'In dispute',
   settled: 'Settled',
+};
+
+/** An open still waiting for the other side, or one that did not happen (BRD 2.2.14.8). */
+export const PENDING_TEXT: Record<PendingOpen['state'], string> = {
+  waiting: 'Pending',
+  declined: 'Declined',
+  failed: 'Not opened',
 };
 
 /** The user's nickname for the peer, else a short form of its peer id. */

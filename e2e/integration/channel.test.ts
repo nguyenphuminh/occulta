@@ -39,7 +39,12 @@ describe('channels on the dev node', () => {
   const mine = (r: ChannelRecord) => balanceOf(r.latest.state, sideOf(r));
   /** Opens an ETH channel A→B that both fund, and ticks until it is live on both sides. */
   const openLive = async (window: bigint, amount = parseEther('0.1'), peerAmount = parseEther('0.05')): Promise<string> => {
-    const opened = await a.channels.open(await invite(bob, b), { token: ETH, amount, peerAmount, window, relayer: relayer.port });
+    const before = shielded(alice);
+    let accepted: unknown = null;
+    const onAccepted = (channelId: string) => (accepted = { channelId, status: a.channels.get(channelId).status, balance: shielded(alice) });
+    const opened = await a.channels.open(await invite(bob, b), { token: ETH, amount, peerAmount, window, relayer: relayer.port, onAccepted });
+    // A hears of the accepted channel once it is saved, before she funds it.
+    expect(accepted).toEqual({ channelId: opened.id, status: 'opening', balance: before });
     expect(await b.channels.tick(relayer.port)).toEqual([]);
     expect(await a.channels.tick(relayer.port)).toEqual([]);
     expect(a.channels.get(opened.id).status).toBe('live');

@@ -57,9 +57,13 @@ export function InviteDialog() {
   );
 }
 
-/** BRD 2.2.7: open and fund a channel with someone's invite, optionally naming them. */
+/**
+ * BRD 2.2.7: open and fund a channel with someone's invite, optionally naming them. Confirming hands
+ * the open to the background (BRD 2.2.14.8): its conversation shows the progress while the other side
+ * decides, and the rest of the wallet stays usable.
+ */
 export function OpenDialog({ initialInvite }: { initialInvite: string }) {
-  const { occulta, refresh } = useApp();
+  const { occulta, pendingOpens } = useApp();
   const network = occulta.network();
   const [invite, setInvite] = useState(initialInvite);
   const [nickname, setNicknameText] = useState('');
@@ -95,12 +99,20 @@ export function OpenDialog({ initialInvite }: { initialInvite: string }) {
           </p>
         }
         run={async (relayer) => {
-          const record = await occulta.channels.open(decodeInvite(invite), { token: tokenId(token, network), amount: parseAmount(token, amount) as bigint, peerAmount: ask ?? 0n, relayer });
-          if (nickname.trim()) await setNickname(occulta, record.peer.peerId, nickname);
-          opened.current = record.id;
+          const target = decodeInvite(invite);
+          const terms = { token: tokenId(token, network), amount: parseAmount(token, amount) as bigint, peerAmount: ask ?? 0n };
+          if (nickname.trim()) await setNickname(occulta, target.peerId, nickname);
+          const { channels, wallet } = occulta;
+          opened.current = pendingOpens.start(
+            { accountId: wallet.activeAccount().id, networkId: network.id, peerId: target.peerId, ...terms },
+            (onAccepted) => channels.open(target, { ...terms, relayer, onAccepted }),
+            // Someone still looking at the request follows it to the channel.
+            (pendingId, channelId) => {
+              if (location.hash === `#/channels/${pendingId}`) location.hash = `#/channels/${channelId}`;
+            },
+          );
         }}
         onDone={() => {
-          refresh();
           location.hash = `#/channels/${opened.current}`;
         }}
       />

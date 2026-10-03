@@ -946,12 +946,14 @@ button.icon-button {
   color: var(--ok);
 }
 
-.pill.status-disputing {
+.pill.status-disputing,
+.pill.status-failed {
   background: var(--danger-soft);
   color: var(--danger);
 }
 
 .pill.status-opening,
+.pill.status-pending,
 .pill.status-funding,
 .pill.status-closing {
   background: var(--accent-soft);
@@ -1321,6 +1323,14 @@ button.icon-button {
   color: var(--muted);
   font-size: 0.78rem;
   text-align: center;
+}
+
+.event .spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
 }
 
 .conversation > .notice,

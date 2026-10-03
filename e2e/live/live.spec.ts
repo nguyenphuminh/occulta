@@ -18,6 +18,7 @@ import {
   createWallet,
   openAction,
   openChannel,
+  openChannels,
   openDialog,
   openSettings,
   openWallet,
@@ -245,11 +246,11 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     await expect(bobPage.getByTestId('shielded-eth')).toHaveText('0.0025 ETH');
   });
 
-  test('a channel that asks the invitee to fund: declined, unanswered, then accepted with a nickname, and a started dispute', async () => {
+  test('a channel that asks the invitee to fund, without holding up the opener: declined, unanswered, then accepted with a nickname, and a started dispute', async () => {
     const a = alice.page;
     const link = await invite(bobPage);
     const request = bobPage.getByRole('dialog', { name: 'Channel request' });
-    const review = a.getByRole('dialog', { name: 'Confirm: Open channel' });
+    const waiting = a.getByTestId('pending-open');
     for (const answer of ['decline', 'ignore', 'accept'] as const) {
       await a.goto('/#/channels'); // a fresh form each time
       await a.goto(link);
@@ -257,17 +258,26 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
       await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.001');
       await open.getByLabel('Ask the other side to fund (ETH, optional)', { exact: true }).fill('0.0005');
       await open.getByRole('button', { name: 'Open channel' }).click();
-      await review.getByRole('button', { name: 'Confirm' }).click();
+      await confirmRelayed(a, 'Open channel'); // closes at once; the request waits in its own conversation
+      await expect(waiting).toContainText('Waiting for');
       await expect(request).toContainText('They fund 0.001 ETH and ask you to fund 0.0005 ETH');
       if (answer === 'accept') {
         await request.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
         await request.getByRole('button', { name: 'Accept and fund' }).click();
-        await expect(review).toBeHidden({ timeout: 300_000 });
+        await expect(a).toHaveURL(/#\/channels\/[0-9a-f]{32}$/, { timeout: 300_000 }); // on to the channel
       } else {
-        if (answer === 'decline') await request.getByRole('button', { name: 'Decline' }).click();
-        await expect(review.getByRole('alert')).toHaveText('The other party declined this channel', { timeout: 120_000 });
+        if (answer === 'decline') {
+          // Meanwhile Alice uses the rest of the wallet.
+          await openAction(a, 'Receive');
+          await popup(a, 'Receive').getByRole('button', { name: 'Close' }).click();
+          await request.getByRole('button', { name: 'Decline' }).click();
+          await openChannels(a);
+          await a.getByTestId('channel-item').first().click();
+        }
+        await expect(waiting).toContainText('declined, or did not answer in time', { timeout: 120_000 });
         await expect(request).toBeHidden();
-        await review.getByRole('button', { name: 'Cancel' }).click();
+        await waiting.getByRole('button', { name: 'Dismiss' }).click();
+        await expect(waiting).toBeHidden();
       }
     }
     const aliceChannel = channelView(a);

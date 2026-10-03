@@ -5,12 +5,13 @@ import { formatAmount, parseAmount, SYMBOL, tokenId, tokenName } from '../../sha
 import { Avatar, BackIcon, EditIcon, SendIcon } from '../../shared/icons.tsx';
 import { Button, ErrorNote, Modal, RelayedSubmit, useAction } from '../../shared/ui.tsx';
 import { MAX_NICKNAME, setNickname } from './nicknames.ts';
-import { STATUS_TEXT, peerName } from './status.ts';
+import type { PendingOpen } from './pendingOpens.ts';
+import { PENDING_TEXT, STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
 /** One channel as a conversation (BRD 2.2.8–2.2.10): balances, payments either way, pay, close or dispute. */
 export function Conversation({ record, channels, names }: { record: ChannelRecord; channels: ChannelService; names: Record<string, string> }) {
-  const { occulta, refresh } = useApp();
+  const { occulta, pendingOpens, refresh } = useApp();
   const network = occulta.network();
   const token = tokenName(record.token);
   const me = sideOf(record);
@@ -39,6 +40,7 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
     refresh();
   });
   const live = record.status === 'live';
+  const funding = pendingOpens.fundingError(record.id);
   const entries = timelineOf(record);
   const timeline = useRef<HTMLOListElement>(null);
   // The newest payment stays in view, as in a chat.
@@ -156,6 +158,7 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
       ) : null}
 
       <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error} />
+      {record.status === 'opening' ? <ErrorNote error={funding && `Funding this channel failed: ${funding}`} /> : null}
       <div className="composer">
         <label className="composer-field">
           <span className="sr-only">Pay ({SYMBOL[token]})</span>
@@ -187,6 +190,85 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
           </div>
         </Modal>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * An open waiting for the other side, laid out like its channel will be (BRD 2.2.14.8): the request,
+ * then what became of it. Nothing leaves the shielded balance until the other side accepts.
+ */
+export function PendingConversation({ open, names }: { open: PendingOpen; names: Record<string, string> }) {
+  const { pendingOpens } = useApp();
+  const token = tokenName(open.token);
+  const name = peerName(open.peerId, names);
+  return (
+    <section className="conversation" aria-label="Channel" data-testid="pending-open">
+      <header className="conversation-head">
+        <a className="icon-button only-narrow" href="#/channels" aria-label="Back to channels">
+          <BackIcon />
+        </a>
+        <Avatar seed={open.peerId} size={40} />
+        <div className="conversation-title">
+          <span className="conversation-name">
+            <h2 className="peer-name truncate">{name}</h2>
+          </span>
+          <span className="muted small">You are opening it</span>
+        </div>
+        <span className={`pill status-${open.state === 'waiting' ? 'pending' : open.state}`}>{PENDING_TEXT[open.state]}</span>
+      </header>
+
+      <div className="channel-strip">
+        <dl className="balance-strip">
+          <div>
+            <dt>You fund</dt>
+            <dd>{formatAmount(token, open.amount)}</dd>
+          </div>
+          {open.peerAmount > 0n ? (
+            <div>
+              <dt>You asked them for</dt>
+              <dd>{formatAmount(token, open.peerAmount)}</dd>
+            </div>
+          ) : null}
+        </dl>
+        {open.state === 'waiting' ? null : (
+          <div className="channel-actions">
+            <Button
+              className="secondary small"
+              onClick={() => {
+                pendingOpens.dismiss(open.id);
+                location.hash = '#/channels';
+              }}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <ol className="timeline">
+        <li className="event">{open.peerAmount > 0n ? `You asked ${name} to open a channel` : `You are opening a channel with ${name}`}</li>
+        {open.state === 'waiting' ? (
+          <li className="event" aria-busy="true">
+            <span className="spinner" aria-hidden="true" /> {open.peerAmount > 0n ? `Waiting for ${name} to accept` : `Reaching ${name}…`}
+          </li>
+        ) : (
+          <>
+            <li className="event">{open.state === 'declined' ? `${name} declined, or did not answer in time` : `The channel was not opened: ${open.error}`}</li>
+            <li className="event">Nothing left your shielded balance.</li>
+          </>
+        )}
+      </ol>
+
+      <div className="composer">
+        <label className="composer-field">
+          <span className="sr-only">Pay ({SYMBOL[token]})</span>
+          <input aria-label={`Pay (${SYMBOL[token]})`} disabled placeholder="Payments open once the channel is live" />
+        </label>
+        <Button className="primary round" aria-label="Pay" disabled>
+          <SendIcon />
+        </Button>
+      </div>
     </section>
   );
 }

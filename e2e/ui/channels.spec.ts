@@ -1,7 +1,7 @@
-// BRD 2.2.6–2.2.10 and 2.2.14.6 in the browser: invite link or pasted code, opening in ETH or USDG,
+// BRD 2.2.6–2.2.10 and 2.2.14.6–2.2.14.8 in the browser: invite link or pasted code, opening in ETH or USDG,
 // payments confirmed in the wallet's dialog, a locked receiver, cooperative close, approving,
-// declining or ignoring a channel that asks for funds, starting a dispute, peer nicknames, and a
-// restored export.
+// declining or ignoring a channel that asks for funds while the opener goes on using the wallet,
+// starting a dispute, peer nicknames, and a restored export.
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
@@ -106,24 +106,47 @@ test('a channel from an invite link: open with a nickname, pay both ways with co
 test('a channel that asks the invitee to fund needs approval; a dispute can be started', async ({ browser }) => {
   const [alice, bob] = await Promise.all([userWithShieldedEth(browser, '0.1'), userWithShieldedEth(browser, '0.1')]);
 
-  // Bob declines the first request, then accepts the second.
+  // Bob declines the first request, then accepts the second. Alice never waits on his answer.
   for (const accept of [false, true]) {
     const link = await invite(bob);
     await alice.goto(link);
     const open = openDialog(alice);
+    await open.getByLabel('Nickname (optional)', { exact: true }).fill('Bob');
     await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.03');
     await open.getByLabel('Ask the other side to fund (ETH, optional)', { exact: true }).fill('0.02');
     await open.getByRole('button', { name: 'Open channel' }).click();
-    await alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('button', { name: 'Confirm' }).click();
+    await confirmRelayed(alice, 'Open channel'); // closes at once
+    await expect(open).toBeHidden();
     const request = bob.getByRole('dialog', { name: 'Channel request' });
     await expect(request).toContainText('They fund 0.03 ETH and ask you to fund 0.02 ETH');
-    if (accept) await request.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
-    await request.getByRole('button', { name: accept ? 'Accept and fund' : 'Decline' }).click();
+    const waiting = alice.getByTestId('pending-open');
+    await expect(waiting).toContainText('Waiting for Bob to accept');
+    await expect(waiting.getByRole('heading', { level: 2 })).toHaveText('Bob');
+    await expect(alice.getByTestId('channel-item')).toHaveCount(1);
+    await expect(alice.getByTestId('channel-item').first()).toContainText('Pending');
+
     if (!accept) {
-      await expect(alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('alert')).toHaveText('The other party declined this channel');
-      await alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('button', { name: 'Cancel' }).click();
+      // Meanwhile Alice uses the rest of the wallet; nothing has left her balance.
+      await openAction(alice, 'Receive');
+      await popup(alice, 'Receive').getByRole('button', { name: 'Close' }).click();
+      await expect(alice.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
+      await request.getByRole('button', { name: 'Decline' }).click();
+      await openChannels(alice);
+      const declined = alice.getByTestId('channel-item').first();
+      await expect(declined).toContainText('Declined');
+      await declined.click();
+      await expect(waiting).toContainText('Bob declined, or did not answer in time');
+      await expect(waiting).toContainText('Nothing left your shielded balance');
+      await waiting.getByRole('button', { name: 'Dismiss' }).click();
+      await expect(alice.getByTestId('channel-item')).toHaveCount(0);
+      await expect(alice).toHaveURL(/#\/channels$/);
     } else {
-      await expect(alice.getByRole('dialog', { name: 'Confirm: Open channel' })).toBeHidden({ timeout: 120_000 });
+      await request.getByLabel('Nickname for them (optional)', { exact: true }).fill('Alice');
+      await request.getByRole('button', { name: 'Accept and fund' }).click();
+      // Alice was looking at the request: she follows it to the channel, listed once.
+      await expect(alice).toHaveURL(/#\/channels\/[0-9a-f]{32}$/);
+      await expect(waiting).toBeHidden();
+      await expect(alice.getByTestId('channel-item')).toHaveCount(1);
     }
   }
 
@@ -206,12 +229,21 @@ test('a channel request nobody answers counts as declined', async ({ browser }) 
   await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.02');
   await open.getByLabel('Ask the other side to fund (ETH, optional)', { exact: true }).fill('0.01');
   await open.getByRole('button', { name: 'Open channel' }).click();
-  await alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('button', { name: 'Confirm' }).click();
+  await confirmRelayed(alice, 'Open channel');
   const request = bob.getByRole('dialog', { name: 'Channel request' });
   await expect(request).toBeVisible();
-  await expect(alice.getByRole('dialog', { name: 'Confirm: Open channel' }).getByRole('alert')).toHaveText('The other party declined this channel', { timeout: 75_000 });
+  const waiting = alice.getByTestId('pending-open');
+  await expect(waiting).toContainText('Waiting for');
+  await expect(waiting).toContainText('declined, or did not answer in time', { timeout: 75_000 });
+  await expect(alice.getByTestId('channel-item').first()).toContainText('Declined');
   await expect(request).toBeHidden();
   await expect(bob.getByTestId('channel-item')).toHaveCount(0);
+  // It stays until dismissed.
+  await openChannels(alice);
+  await expect(alice.getByTestId('channel-item')).toHaveCount(1);
+  await alice.getByTestId('channel-item').first().click();
+  await waiting.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(alice.getByTestId('channel-item')).toHaveCount(0);
 });
 
 test('a restored export keeps its notes, nicknames and a live channel, which can still be paid and closed', async ({ browser }) => {

@@ -105,6 +105,8 @@ export interface OpenOptions {
   window?: bigint;
   relayer: RelayerPort;
   accountId?: string;
+  /** Called once the other side has accepted and the channel is saved, before this side funds it. */
+  onAccepted?: (channelId: string) => void;
 }
 
 export interface TickProblem {
@@ -230,6 +232,7 @@ export class ChannelService {
       record.pending = { prevHash: hashOf(record, s0), state: s1, sig: signStateHash(secrets.signingKey, hashOf(record, s1)) };
     }
     await repository.save(record, account);
+    o.onAccepted?.(id);
 
     // A funds only now that she holds state 0 signed by both sides, and signs state 1 after funding.
     const [noteA] = contributionsOf(record);
