@@ -261,13 +261,15 @@ async function main(): Promise<void> {
   const wallet = await relayWallet();
   checkNetworkConfig(wallet);
   if (run('git', ['status', '--porcelain'], { quiet: true }).trim()) throw new Error('commit your changes first: the live deployment ships the current commit');
-  const token = secret('cloudflare.token');
-  if (!token) throw new Error(`put a Cloudflare API token for ${DOMAIN} in ${join(SECRETS, 'cloudflare.token')}`);
   const project = projectId(values.project);
   await fundRelayer(wallet);
   const ip = ensureVm(project);
-  await pointRelayName(token, ip);
   await installRelay(project, wallet);
+  const token = secret('cloudflare.token');
+  if (!token) throw new Error(`put a Cloudflare API token for ${DOMAIN} in ${join(SECRETS, 'cloudflare.token')}, then run this again`);
+  await pointRelayName(token, ip);
+  // Caddy asks for its certificate as soon as the name points here, instead of at its next retry.
+  gcloud(project, ['compute', 'ssh', VM.name, `--zone=${VM.zone}`, '--command=sudo systemctl restart caddy']);
   await waitForRelay(wallet);
   await deployWebsite(token);
   console.log(`\nLive: https://${DOMAIN} · relayer ${RELAYER_URL} · relay ${relayAddress(wallet.relayPeerId)}`);

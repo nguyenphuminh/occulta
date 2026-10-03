@@ -29,6 +29,7 @@
     "test:contracts": "cargo test --manifest-path contracts/Cargo.toml",
     "test:integration": "vitest run --project integration",
     "test:ui": "playwright test -c e2e/playwright.config.ts",
+    "test:live": "playwright test -c e2e/live/playwright.config.ts",
     "test:impact": "node scripts/test-impact.ts"
   },
   "devDependencies": {

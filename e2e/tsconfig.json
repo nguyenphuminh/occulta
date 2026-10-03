@@ -13,6 +13,7 @@
   "include": [
     "integration",
     "ui",
+    "live",
     "playwright.config.ts",
     "../scripts/lib",
     "../packages/framework/src/types"
