@@ -129,8 +129,9 @@ deploys the website, and checks the relayer over HTTPS and a relay reservation f
 
 `npm run test:live` then runs the user flows in a browser against the live site with real Sepolia
 transactions, paid from the funder key and swept back at the end; each test wallet's phrase is kept in
-`.occulta/live/test-wallets.jsonl` in case a run leaves money behind. Finishing a dispute needs the
-contracts' 3–7 day window, so live runs only start one; the rest is covered on the dev chain.
+`.occulta/live/test-wallets.jsonl` in case a run leaves money behind. Live runs never start a dispute:
+settling one needs the contracts' 3–7 day window, so its money would be lost; the dev-chain UI tests
+cover disputes with a short window.
 
 ## Gas (dev node, measured by the integration tests)
 

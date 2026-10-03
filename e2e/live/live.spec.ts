@@ -1,8 +1,8 @@
 // The live deployment (npm run deploy:live) from a user's side: https://occulta.space on Arbitrum
 // Sepolia, its relayer and libp2p relay at relay.occulta.space. npm run test:live.
-// Test money comes from ~/.occulta-secrets/funder.key and goes back to it at the end. A dispute can
-// only be started here: finishing one takes the contracts' 3–7 day window, so the rest of the
-// dispute flows is covered by the dev-chain UI tests.
+// Test money comes from ~/.occulta-secrets/funder.key and goes back to it at the end. No dispute is
+// started here: settling one takes the contracts' 3–7 day window, longer than a run keeps its
+// wallets, so its money would be lost. The dev-chain UI tests cover disputes with a short window.
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -250,7 +250,7 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     await expect(bobPage.getByTestId('shielded-eth')).toHaveText('0.0025 ETH');
   });
 
-  test('a channel that asks the invitee to fund, without holding up the opener: declined, unanswered, then accepted with a nickname, and a started dispute', async () => {
+  test('a channel that asks the invitee to fund, without holding up the opener: declined, unanswered, then accepted with a nickname, and closed', async () => {
     const a = alice.page;
     const link = await invite(bobPage);
     const request = bobPage.getByRole('dialog', { name: 'Channel request' });
@@ -297,9 +297,16 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     await expect(bobChannel).toContainText('Live', { timeout: 300_000 });
     await expect(bobChannel.getByRole('heading', { level: 2 })).toHaveText('Alice');
     await expect(bobChannel.getByTestId('channel-mine')).toHaveText('0.0005 ETH');
+    // Closing without the other side is offered, but not started: its 7-day window outlasts the run.
     await bobChannel.getByRole('button', { name: 'Close without the other side' }).click();
-    await bobPage.getByRole('dialog', { name: 'Close without the other side' }).getByRole('button', { name: 'Start dispute' }).click();
-    await expect(bobChannel).toContainText('In dispute');
-    await expect(aliceChannel).toContainText('In dispute');
+    const dispute = bobPage.getByRole('dialog', { name: 'Close without the other side' });
+    await expect(dispute).toContainText('7-day window');
+    await dispute.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dispute).toBeHidden();
+    // Bob closes it with Alice instead, so both shares go back to their shielded balances.
+    await bobChannel.getByRole('button', { name: 'Close channel' }).click();
+    await confirmRelayed(bobPage, 'Close channel');
+    await expect(bobChannel).toContainText('Closed');
+    await expect(aliceChannel).toContainText('Closed');
   });
 });

@@ -1,7 +1,7 @@
-// BRD 2.2.10 in the browser, against a counterparty that cheats. The website always opens channels
-// with the 7-day window, so the other side is a framework node in this test process that opens a
-// channel with a 20-second window (the dev-node contracts accept windows from 10 s) and then submits
-// an old state.
+// BRD 2.2.10 in the browser: closing without the other side, and a counterparty that cheats. The
+// website always opens channels with the 7-day window, so the other side is a framework node in this
+// test process that opens a channel with a 20-second window (the dev-node contracts accept windows
+// from 10 s). The live tests never start a dispute: its window could not pass within a run.
 import { expect, test } from '@playwright/test';
 import { parseEther } from 'viem';
 import { ChainAdapter, NetworkConfigSchema } from '../../packages/framework/src/modules/chain/index.ts';
@@ -9,22 +9,23 @@ import { decodeInvite } from '../../packages/framework/src/modules/p2p/index.ts'
 import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.ts';
 import { channelNullifierOf } from '../../packages/framework/src/shared/protocol/index.ts';
 import { mineBlock } from '../integration/chain.ts';
-import { newChannelNode, newUser, type ChannelNode } from '../integration/services.ts';
+import { newChannelNode, newUser, type ChannelNode, type User } from '../integration/services.ts';
 import { createInvite, createWallet, devSend, fundPublicly, openWallet, openAction, openChannel, popup, unlock, useDevNetwork } from './helpers.ts';
 
 const WINDOW = 20n;
 const ETH = 0n;
 let chain: ChainAdapter;
 let relayer: HttpRelayer;
+let aliceUser: User;
 let alice: ChannelNode;
 
 test.beforeAll(async () => {
   const network = NetworkConfigSchema.parse(JSON.parse(process.env.OCCULTA_UI_NETWORK as string));
   chain = new ChainAdapter(network);
   relayer = new HttpRelayer(network.relayers[0] as string);
-  const user = await devSend(() => newUser(network, chain, '1'));
-  await user.pool.deposit(ETH, parseEther('0.1'));
-  alice = await newChannelNode(user, chain, network.libp2pRelays[0] as string);
+  aliceUser = await devSend(() => newUser(network, chain, '1'));
+  await aliceUser.pool.deposit(ETH, parseEther('0.1'));
+  alice = await newChannelNode(aliceUser, chain, network.libp2pRelays[0] as string);
 });
 
 test.afterAll(async () => {
@@ -44,6 +45,37 @@ async function passDeadline(): Promise<void> {
   await new Promise((r) => setTimeout(r, Number(WINDOW) * 1000 + 1500));
   await devSend(() => mineBlock());
 }
+
+test('closing without the other side: after the window the wallet settles on its own, and each side gets its share', async ({ browser }) => {
+  const bob = await (await browser.newContext()).newPage();
+  await createWallet(bob);
+  await useDevNetwork(bob);
+  const opened = await alice.channels.open(decodeInvite(await createInvite(bob)), { token: ETH, amount: parseEther('0.02'), window: WINDOW, relayer });
+  const channel = await openChannel(bob);
+  await expect(channel).toContainText('Live');
+  expect(await alice.channels.tick(relayer)).toEqual([]);
+  await alice.channels.pay(opened.id, parseEther('0.01'));
+  await expect(channel.getByTestId('channel-mine')).toHaveText('0.01 ETH');
+
+  // Bob closes on his own from the website, with the latest state.
+  await channel.getByRole('button', { name: 'Close without the other side' }).click();
+  await bob.getByRole('dialog', { name: 'Close without the other side' }).getByRole('button', { name: 'Start dispute' }).click();
+  await expect(channel).toContainText('In dispute');
+  const record = alice.channels.get(opened.id);
+  const disputed = async () => (await chain.disputeOf(channelNullifierOf(record.params.channelSecret))).nonce;
+  await expect.poll(disputed, { timeout: 60_000 }).toBe(record.history.at(-1)?.[3]);
+
+  // Once the window has passed, Bob's open wallet settles it and his share is in his shielded balance.
+  await passDeadline();
+  await expect(channel).toContainText('Settled', { timeout: 120_000 });
+  await openWallet(bob);
+  await expect(bob.getByTestId('shielded-eth')).toHaveText('0.01 ETH');
+  // Alice's share reaches her as soon as her wallet looks.
+  const aliceBefore = aliceUser.pool.balances().get(ETH) ?? 0n;
+  expect(await alice.disputes.tick(relayer)).toEqual([]);
+  expect(alice.channels.get(opened.id).status).toBe('settled');
+  expect(aliceUser.pool.balances().get(ETH)).toBe(aliceBefore + record.latest.state.balA);
+});
 
 test('scenario B: the open wallet answers an old state, finalizes after the deadline and keeps what it was owed', async ({ browser }) => {
   const bob = await (await browser.newContext()).newPage();
