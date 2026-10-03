@@ -246,8 +246,8 @@ async function installRelay(project: string, wallet: RelayWallet): Promise<void>
 // --- checks: the relayer answers over HTTPS, and a peer reserves a slot whose invite carries the public address ---
 
 async function waitForRelay(wallet: RelayWallet): Promise<void> {
-  step(`waiting for ${RELAYER_URL} (Caddy gets its certificate on the first request)`);
-  const deadline = Date.now() + 10 * 60_000;
+  step(`waiting for ${RELAYER_URL} (Caddy gets its certificate first; after rate-limited attempts, within the hour)`);
+  const deadline = Date.now() + 70 * 60_000;
   for (;;) {
     try {
       const res = await fetch(`${RELAYER_URL}/relayer/info`, { signal: AbortSignal.timeout(10_000) });
@@ -258,7 +258,7 @@ async function waitForRelay(wallet: RelayWallet): Promise<void> {
     } catch {
       // not up yet
     }
-    if (Date.now() > deadline) throw new Error(`${RELAYER_URL} did not answer in 10 minutes`);
+    if (Date.now() > deadline) throw new Error(`${RELAYER_URL} did not answer in 70 minutes`);
     await new Promise((r) => setTimeout(r, 5_000));
   }
   const relay = relayAddress(wallet.relayPeerId);
@@ -282,13 +282,13 @@ async function main(): Promise<void> {
   const project = projectId(values.project);
   await fundRelayer(wallet);
   const ip = ensureVm(project);
-  await installRelay(project, wallet);
+  // The name first: Caddy asks for its certificate as soon as it starts, and every lookup that fails
+  // before the record exists counts against Let's Encrypt's 5 failed validations per hour.
   const auth = cloudflareAuth();
   await pointRelayName(auth.apiToken, ip);
-  // Caddy asks for its certificate as soon as the name points here, instead of at its next retry.
-  gcloud(project, ['compute', 'ssh', VM.name, `--zone=${VM.zone}`, '--command=sudo systemctl restart caddy']);
-  await waitForRelay(wallet);
+  await installRelay(project, wallet);
   await deployWebsite(auth);
+  await waitForRelay(wallet);
   console.log(`\nLive: https://${DOMAIN} · relayer ${RELAYER_URL} · relay ${relayAddress(wallet.relayPeerId)}`);
 }
 
