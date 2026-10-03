@@ -7,6 +7,8 @@ import { createRelayNode } from '../../packages/framework/src/libp2p.node.ts';
 import { ChainAdapter } from '../../packages/framework/src/modules/chain/index.ts';
 import { balanceOf, hashOf, sideOf, type ChannelRecord } from '../../packages/framework/src/modules/channel/index.ts';
 import { channelSecrets, shieldedAddressOf } from '../../packages/framework/src/modules/keys/index.ts';
+import type { RelayRequest, RelayerPort } from '../../packages/framework/src/modules/relayer/index.ts';
+import { AppError } from '../../packages/framework/src/shared/errors/AppError.ts';
 import { signStateHash } from '../../packages/framework/src/shared/protocol/index.ts';
 import { freshDeployment, mineBlock } from './chain.ts';
 import { devNetwork, newChannelNode, newRelayer, newUser, type ChannelNode, type User } from './services.ts';
@@ -240,6 +242,91 @@ describe('channels on the dev node', () => {
       expect(shielded(bob)).toBe(bobBefore + parseEther('0.02') - fees.eth);
       // He was owed 0.03 by the latest state: missing the window cost him the 0.01 Alice had paid (BRD scenario C).
       expect(mine(b.channels.get(id))).toBe(parseEther('0.03'));
+    });
+
+  });
+
+  describe('an opening whose funding fails (BRD 2.2.7)', () => {
+    /** Opens A→B through a relayer that never relays A's funding; returns the stuck channel's id. */
+    const openUnfunded = async (submit: RelayerPort['submit'], peerAmount = parseEther('0.01')): Promise<string> => {
+      let id = '';
+      const relayerThatFails: RelayerPort = { info: () => relayer.port.info(), submit };
+      const failure = await code(a.channels.open(await invite(bob, b), { token: ETH, amount: parseEther('0.02'), peerAmount, window: 10n, relayer: relayerThatFails, onAccepted: (channelId) => (id = channelId) }));
+      expect(failure).toBe('RELAYER_DOWN');
+      return id;
+    };
+    const down = async (): Promise<never> => {
+      throw new AppError(503, 'RELAYER_DOWN', 'The relayer is down');
+    };
+    const problemsOf = async (id: string) => (await a.channels.tick(relayer.port)).filter((p) => p.channelId === id).map((p) => (p.error as { code?: string }).code);
+
+    it('is stuck on both sides until cancelled: the opener at once, and the invitee is told; nothing left anyone’s balance', async () => {
+      const before = [shielded(alice), shielded(bob)];
+      const id = await openUnfunded(down);
+      expect([a.channels.get(id).status, b.channels.get(id).status]).toEqual(['opening', 'opening']);
+      expect(await problemsOf(id)).toEqual([]); // nothing to confirm: A's contribution is not in the pool
+      expect(a.channels.openerFunded(id)).toBe(false);
+      // The invitee waits ten minutes before it may cancel, in case the opener is still funding.
+      expect(b.channels.canCancel(id)).toBe(false);
+      expect(await code(b.channels.cancel(id))).toBe('NOT_CANCELLABLE');
+      expect(a.channels.canCancel(id)).toBe(true);
+      await a.channels.cancel(id);
+      expect([a.channels.get(id).status, b.channels.get(id).status]).toEqual(['cancelled', 'cancelled']);
+      expect(a.channels.canCancel(id)).toBe(false);
+      await Promise.all([alice.pool.sync(), bob.pool.sync()]);
+      expect([shielded(alice), shielded(bob)]).toEqual(before);
+    });
+
+    it('never makes the invitee fund before the opener’s contribution is in the pool, even when the opener confirms anyway', async () => {
+      const id = await openUnfunded(down);
+      const bobBefore = shielded(bob);
+      // A misbehaving opener sends its confirmation although its funding never went through.
+      const opener = a.channels as unknown as { confirmOpening(id: string, account: string): Promise<void> };
+      await opener.confirmOpening(id, alice.wallet.activeAccount().id);
+      expect(b.channels.get(id).status).toBe('funding');
+      expect((await b.channels.tick(relayer.port)).filter((p) => p.channelId === id)).toEqual([]);
+      await bob.pool.sync();
+      expect(shielded(bob)).toBe(bobBefore);
+      expect(b.channels.get(id).status).toBe('funding');
+    });
+
+    it('can be cancelled by the invitee ten minutes after it accepted, and the opener is told', async () => {
+      const id = await openUnfunded(down);
+      await b.channels.update(id, async (r) => {
+        r.createdAt = Date.now() - 11 * 60_000;
+      });
+      expect(b.channels.canCancel(id)).toBe(true);
+      await b.channels.cancel(id);
+      expect([a.channels.get(id).status, b.channels.get(id).status]).toEqual(['cancelled', 'cancelled']);
+    });
+
+    it('comes back when a funding still lands after the cancel; refused by the other side, the opener recovers it with state 0', async () => {
+      const before = shielded(alice);
+      let late: RelayRequest | undefined;
+      // The relayer got the funding but its answer was lost: it may still go through.
+      const id = await openUnfunded(async (request) => {
+        late = request;
+        return down();
+      }, 0n);
+      await a.channels.cancel(id);
+      expect(b.channels.get(id).status).toBe('cancelled');
+
+      await relayer.port.submit(late as RelayRequest);
+      expect(await problemsOf(id)).toEqual([]);
+      expect(a.channels.get(id).status).toBe('opening'); // the money is in the channel, so it goes on
+      expect(a.channels.openerFunded(id)).toBe(true);
+      expect(a.channels.canCancel(id)).toBe(false);
+      expect(await code(a.channels.cancel(id))).toBe('NOT_CANCELLABLE');
+      // Bob cancelled when he was told, so he refuses to go on (as when he never confirms at all).
+      expect(await problemsOf(id)).toEqual(['CANCELLED']);
+      await a.disputes.start(id, relayer.port);
+      expect(a.channels.get(id).status).toBe('disputing');
+      await passDeadline(10n);
+      expect(await a.disputes.tick(relayer.port)).toEqual([]);
+      expect(a.channels.get(id).status).toBe('settled');
+      await alice.pool.sync();
+      // Back in full, less the funding's and the close's relayer fees.
+      expect(shielded(alice)).toBe(before - 2n * fees.eth);
     });
   });
 });

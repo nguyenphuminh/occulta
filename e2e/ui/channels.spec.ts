@@ -5,6 +5,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   card,
   channelView,
@@ -101,6 +102,47 @@ test('a channel from an invite link: open with a nickname, pay both ways with co
   await expect(bobChannel).toContainText('Closed');
   await openWallet(bob);
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.008 ETH');
+});
+
+test('an opening whose funding fails after the other side accepts can be cancelled; nothing left either balance', async ({ browser }) => {
+  const [alice, bob] = await Promise.all([userWithShieldedEth(browser, '0.1'), userWithShieldedEth(browser, '0.1')]);
+  await alice.goto(await invite(bob));
+  const open = openDialog(alice);
+  await open.getByLabel('Nickname (optional)', { exact: true }).fill('Bob');
+  await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.05');
+  await open.getByLabel('Ask the other side to fund (ETH, optional)', { exact: true }).fill('0.01');
+  await open.getByRole('button', { name: 'Open channel' }).click();
+  await confirmRelayed(alice, 'Open channel');
+  const request = bob.getByRole('dialog', { name: 'Channel request' });
+  await expect(request).toBeVisible();
+
+  // While Bob decides, Alice withdraws most of her money, so she can no longer fund the channel.
+  await openAction(alice, 'Withdraw');
+  const withdraw = popup(alice, 'Withdraw');
+  await withdraw.getByLabel('Amount (ETH)', { exact: true }).fill('0.09');
+  await withdraw.getByLabel('Recipient address', { exact: true }).fill(privateKeyToAccount(generatePrivateKey()).address);
+  await withdraw.getByRole('button', { name: 'Withdraw' }).click();
+  await confirmRelayed(alice, 'Withdraw');
+  await withdraw.getByRole('button', { name: 'Close' }).click();
+  await expect(alice.getByTestId('shielded-eth')).toHaveText('0.0099 ETH');
+
+  await request.getByRole('button', { name: 'Accept and fund' }).click();
+  await openChannels(alice);
+  await alice.getByTestId('channel-item').first().click();
+  const aliceChannel = channelView(alice);
+  await expect(aliceChannel).toContainText('Funding this channel failed: Not enough shielded funds');
+  await expect(aliceChannel).toContainText('Opening');
+  const bobChannel = await openChannel(bob);
+  await expect(bobChannel).toContainText('Opening');
+  await expect(bobChannel.getByRole('button', { name: 'Cancel opening' })).toHaveCount(0); // she may still be funding
+
+  await aliceChannel.getByRole('button', { name: 'Cancel opening' }).click();
+  await expect(aliceChannel).toContainText('Cancelled before it was funded');
+  await expect(bobChannel).toContainText('Cancelled before it was funded');
+  await openWallet(alice);
+  await expect(alice.getByTestId('shielded-eth')).toHaveText('0.0099 ETH');
+  await openWallet(bob);
+  await expect(bob.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
 });
 
 test('a channel that asks the invitee to fund needs approval; a dispute can be started', async ({ browser }) => {

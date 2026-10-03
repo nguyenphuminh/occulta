@@ -43,7 +43,8 @@ export interface DisputeDeps {
 type Signed = ChannelRecord['latest'];
 
 /** Channels that can still be disputed or settled. */
-const WATCHED = new Set<ChannelRecord['status']>(['funding', 'live', 'closing', 'disputing']);
+// An opening is watched too: once the opener has funded, it can close it with state 0 if the other side never confirms.
+const WATCHED = new Set<ChannelRecord['status']>(['opening', 'funding', 'live', 'closing', 'disputing']);
 
 /**
  * Unilateral close (BRD 2.2.10): starts a dispute with the best state this side holds, answers a

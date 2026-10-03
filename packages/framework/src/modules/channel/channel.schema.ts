@@ -18,7 +18,7 @@ const ParamsSchema = z.object({ pkA: pk, pkB: pk, channelSecret: big, window: bi
 const ContributionSchema = z.object({ amount: big, salt: big });
 const SignedSchema = z.object({ state: StateSchema, sigA: SignatureSchema.nullable(), sigB: SignatureSchema.nullable() });
 
-export const CHANNEL_STATUSES = ['opening', 'funding', 'live', 'closing', 'closed', 'disputing', 'settled'] as const;
+export const CHANNEL_STATUSES = ['opening', 'funding', 'live', 'closing', 'closed', 'disputing', 'settled', 'cancelled'] as const;
 
 /** Everything a party keeps about a channel (BRD 2.2.14.6 lists it among the exported data). */
 export const ChannelRecordSchema = z.object({
@@ -46,6 +46,8 @@ export const ChannelRecordSchema = z.object({
    */
   history: z.array(z.tuple([big, big, big, big, z.boolean()])),
   closeTx: hexString.nullable(),
+  /** When this side saved the channel (epoch ms); channels from before it was kept have none. */
+  createdAt: z.number().int().nonnegative().optional(),
 });
 
 export type ChannelRecord = z.output<typeof ChannelRecordSchema>;
@@ -106,4 +108,7 @@ export const ProposeMessageSchema = z.object({
 
 export const ProposeReplySchema = z.object({ sig: SignatureSchema });
 
-export const ChannelMessageSchema = z.discriminatedUnion('type', [OpenMessageSchema, ConfirmMessageSchema, ProposeMessageSchema]);
+/** Either side cancels an opening nobody funded (BRD 2.2.7). */
+export const CancelMessageSchema = z.object({ type: z.literal('cancel'), channelId: z.string() });
+
+export const ChannelMessageSchema = z.discriminatedUnion('type', [OpenMessageSchema, ConfirmMessageSchema, ProposeMessageSchema, CancelMessageSchema]);

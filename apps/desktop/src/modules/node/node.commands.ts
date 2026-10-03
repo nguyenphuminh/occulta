@@ -49,6 +49,7 @@ export const COMMANDS: readonly Command[] = [
   command({ name: 'channel.open', args: ['invite', 'token', 'amount', 'peerAmount', 'window'], summary: 'Open and fund a channel with an invite', schema: openChannelSchema, run: (n, i) => n.openChannel(i) }),
   command({ name: 'channel.pay', args: ['channel', 'amount'], summary: 'Pay in a channel', schema: payChannelSchema, run: (n, i) => n.payChannel(i) }),
   command({ name: 'channel.close', args: ['channel'], summary: 'Close a channel cooperatively', schema: channelSchema, run: (n, i) => n.closeChannel(i.channel) }),
+  command({ name: 'channel.cancel', args: ['channel'], summary: 'Cancel an opening nobody funded', schema: channelSchema, run: (n, i) => n.cancelChannel(i.channel) }),
   command({ name: 'dispute.start', args: ['channel'], summary: 'Close a channel unilaterally', schema: channelSchema, run: (n, i) => n.startDispute(i.channel) }),
   command({ name: 'tick', args: [], summary: 'Sync and move channels and disputes forward now', schema: emptySchema, run: (n) => n.tick() }),
   command({ name: 'export', args: ['path'], summary: 'Write the encrypted export file', schema: exportSchema, run: (n, i) => n.exportWallet(i.path) }),

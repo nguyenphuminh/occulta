@@ -39,8 +39,16 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
     await occulta.tick();
     refresh();
   });
+  const cancel = useAction(async () => {
+    await channels.cancel(record.id);
+    refresh();
+  });
   const live = record.status === 'live';
   const funding = pendingOpens.fundingError(record.id);
+  // An opening nobody funded can be cancelled; once the opener's money is in, only a dispute (with state 0) gets it back.
+  const opening = record.status === 'opening';
+  const cancellable = opening && !pendingOpens.isFunding(record.id) && channels.canCancel(record.id);
+  const disputable = ['funding', 'live', 'closing'].includes(record.status) || (opening && record.role === 'A' && channels.openerFunded(record.id));
   const entries = timelineOf(record);
   const timeline = useRef<HTMLOListElement>(null);
   // The newest payment stays in view, as in a chat.
@@ -121,7 +129,12 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
               onDone={refresh}
             />
           ) : null}
-          {['funding', 'live', 'closing'].includes(record.status) ? (
+          {cancellable ? (
+            <Button className="secondary small" busy={cancel.busy} onClick={() => void cancel.perform()}>
+              Cancel opening
+            </Button>
+          ) : null}
+          {disputable ? (
             <Button className="danger small" onClick={() => setDisputing(true)}>
               Close without the other side
             </Button>
@@ -157,7 +170,7 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
         <p className="notice">While your wallet is unlocked, it answers an old state with your latest one, finalizes after the deadline and reclaims what is yours.</p>
       ) : null}
 
-      <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error} />
+      <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error ?? cancel.error} />
       {record.status === 'opening' ? <ErrorNote error={funding && `Funding this channel failed: ${funding}`} /> : null}
       <div className="composer">
         <label className="composer-field">

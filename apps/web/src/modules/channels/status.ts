@@ -9,6 +9,7 @@ export const STATUS_TEXT: Record<ChannelRecord['status'], string> = {
   closed: 'Closed',
   disputing: 'In dispute',
   settled: 'Settled',
+  cancelled: 'Cancelled',
 };
 
 /** An open still waiting for the other side, or one that did not happen (BRD 2.2.14.8). */

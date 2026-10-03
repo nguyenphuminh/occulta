@@ -27,6 +27,8 @@ export class PendingOpens {
   private items: PendingOpen[] = [];
   /** Why funding failed, by channel id, for channels accepted by the other side. */
   private readonly fundingErrors = new Map<string, string>();
+  /** Channels accepted by the other side that this tab is still funding. */
+  private readonly funding = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private next = 0;
 
@@ -40,6 +42,7 @@ export class PendingOpens {
     const handOver = (channel: string) => {
       if (channelId !== null || !this.has(id)) return;
       channelId = channel;
+      this.funding.add(channel);
       this.items = this.items.filter((p) => p.id !== id);
       this.emit();
       onOpened(id, channel);
@@ -49,11 +52,13 @@ export class PendingOpens {
     open(handOver).then(
       (record) => {
         if (channelId === null) handOver(record.id);
-        else this.emit(); // funded: the channel moved on
+        this.funding.delete(record.id);
+        this.emit(); // funded: the channel moved on
       },
       (err: unknown) => {
         const message = errorText(err);
         if (channelId !== null) {
+          this.funding.delete(channelId);
           this.fundingErrors.set(channelId, message);
           this.emit();
           return;
@@ -65,6 +70,11 @@ export class PendingOpens {
       },
     );
     return id;
+  }
+
+  /** Whether this tab is still funding a channel the other side accepted. */
+  isFunding(channelId: string): boolean {
+    return this.funding.has(channelId);
   }
 
   /** Why this tab could not fund a channel the other side accepted, if it could not. */
@@ -90,6 +100,7 @@ export class PendingOpens {
   clear(): void {
     this.items = [];
     this.fundingErrors.clear();
+    this.funding.clear();
     this.emit();
   }
 

@@ -45,6 +45,7 @@ export function entriesFrom(t: TimelineInput): TimelineEntry[] {
   if (t.status === 'disputing') out.push({ kind: 'event', text: 'Dispute in progress' });
   if (t.status === 'closed') out.push({ kind: 'event', text: 'Closed · your share is in your shielded balance' });
   if (t.status === 'settled') out.push({ kind: 'event', text: 'Settled on-chain' });
+  if (t.status === 'cancelled') out.push({ kind: 'event', text: 'Cancelled before it was funded · nothing left your shielded balance' });
   return out;
 }
 

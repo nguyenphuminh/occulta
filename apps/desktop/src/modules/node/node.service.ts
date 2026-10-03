@@ -160,6 +160,11 @@ export class NodeService {
     return this.describeChannel(await this.occulta.channels.close(id, this.occulta.relayer()));
   }
 
+  /** BRD 2.2.7: cancels an opening nobody funded. */
+  async cancelChannel(id: string) {
+    return this.describeChannel(await this.occulta.channels.cancel(id));
+  }
+
   async startDispute(id: string) {
     return { txHash: await this.occulta.disputes.start(id, this.occulta.relayer()) };
   }

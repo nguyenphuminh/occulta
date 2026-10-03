@@ -57,6 +57,9 @@ import {
   type Side,
 } from './channel.state.ts';
 
+/** How long the invitee waits before it may cancel an opening itself, so that the opener has had time to fund (BRD 2.2.7). */
+export const INVITEE_CANCEL_AFTER_MS = 10 * 60_000;
+
 /** How often one payment is re-proposed after losing a tie-break before giving up. */
 const PROPOSE_ATTEMPTS = 5;
 const CONFLICT_WAIT_MS = 15_000;
@@ -223,6 +226,7 @@ export class ChannelService {
       pending: null,
       history: [],
       closeTx: null,
+      createdAt: Date.now(),
     };
     if (!signedBy(record, 1, s0, reply.sigB0)) throw new AppError(502, 'BAD_SIGNATURE', 'The other party did not sign state 0');
     const sigA0 = signStateHash(secrets.signingKey, hashOf(record, s0));
@@ -261,6 +265,55 @@ export class ChannelService {
       },
       account,
     );
+  }
+
+  // --- cancelling an opening nobody funded (BRD 2.2.7) ---
+
+  /** Whether the opener's contribution is in the pool, as of the last sync. */
+  openerFunded(id: string, accountId?: string): boolean {
+    return this.deps.pool.hasCommitment(contributionCommitments(this.get(id, accountId))[0]);
+  }
+
+  /**
+   * Whether this side may cancel the opening: nobody's money is in the channel yet. The invitee
+   * also waits a while first, so that it never cancels a channel the opener is still funding.
+   */
+  canCancel(id: string, accountId?: string): boolean {
+    return this.cancelProblem(this.get(id, accountId)) === null;
+  }
+
+  /** Cancels an opening nobody funded and tells the other side, when it can be reached. */
+  async cancel(id: string, accountId?: string): Promise<ChannelRecord> {
+    const account = accountId ?? this.deps.wallet.activeAccount().id;
+    await this.deps.pool.refreshChain();
+    const r = await this.update(
+      id,
+      async (r) => {
+        const problem = this.cancelProblem(r);
+        if (problem) throw new AppError(409, 'NOT_CANCELLABLE', problem);
+        r.status = 'cancelled';
+        return r;
+      },
+      account,
+    );
+    await this.deps.p2p.request(r.peer, { type: 'cancel', channelId: id }).catch(() => undefined);
+    return this.get(id, account);
+  }
+
+  private cancelProblem(r: ChannelRecord): string | null {
+    if (r.status !== 'opening') return 'Only a channel that is still opening can be cancelled';
+    if (this.deps.pool.hasCommitment(contributionCommitments(r)[0])) return 'The opener’s contribution is already in the pool, so the channel goes on';
+    if (r.role === 'B' && Date.now() - (r.createdAt ?? 0) < INVITEE_CANCEL_AFTER_MS) return 'The other side may still be funding it; it can be cancelled ten minutes after it was accepted';
+    return null;
+  }
+
+  /** The other side cancelled an opening nobody funded. */
+  private async onCancel(r: ChannelRecord): Promise<unknown> {
+    if (r.status === 'cancelled') return {};
+    await this.deps.pool.refreshChain();
+    if (r.status !== 'opening' || this.deps.pool.hasCommitment(contributionCommitments(r)[0])) throw new AppError(409, 'NOT_CANCELLABLE', 'This channel can no longer be cancelled');
+    r.status = 'cancelled';
+    return {};
   }
 
   // --- payments (BRD 2.2.8) ---
@@ -377,6 +430,9 @@ export class ChannelService {
       try {
         if (status === 'opening' && role === 'A') {
           if (pool.hasCommitment(contributionCommitments(this.get(id, account))[0])) await this.confirmOpening(id, account);
+        } else if (status === 'cancelled' && role === 'A') {
+          // A funding still on its way when the opening was cancelled: the money is in the channel, so it goes on.
+          if (pool.hasCommitment(contributionCommitments(this.get(id, account))[0])) await this.update(id, async (r) => void (r.status = 'opening'), account);
         } else if (status === 'funding') {
           await this.update(id, (r) => this.advanceFunding(r, relayer, account), account);
         } else if (status === 'live' || status === 'closing') {
@@ -430,6 +486,7 @@ export class ChannelService {
       const r = this.deps.repository.get(m.channelId, account);
       if (!r || r.peer.peerId !== fromPeerId) throw new AppError(404, 'CHANNEL_NOT_FOUND', 'No such channel with this peer');
       try {
+        if (m.type === 'cancel') return await this.onCancel(r);
         return m.type === 'confirm' ? await this.onConfirm(r, m, account) : await this.onPropose(r, m, account);
       } finally {
         await this.deps.repository.save(r, account);
@@ -483,6 +540,7 @@ export class ChannelService {
       pending: null,
       history: [],
       closeTx: null,
+      createdAt: Date.now(),
     };
     const sigB0 = signStateHash(secrets.signingKey, hashOf(record, s0));
     record.state0.sigB = sigB0;
@@ -495,6 +553,7 @@ export class ChannelService {
   /** B: receives A's signature of state 0 and the signed state 1 (B funds later, from tick()). */
   private async onConfirm(r: ChannelRecord, m: ConfirmMessage, account: string): Promise<unknown> {
     if (r.role !== 'B') throw new AppError(400, 'BAD_MESSAGE', 'Unexpected confirmation');
+    if (r.status === 'cancelled') throw new AppError(409, 'CANCELLED', 'This channel was cancelled');
     const [cA, cB] = contributionCommitments(r);
     let state1: ChannelState | null = null;
     if (r.contribB) {
