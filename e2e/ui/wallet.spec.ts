@@ -75,7 +75,7 @@ test('creating a wallet: the phrase is shown once, 3 words must match, the passw
   await expect(page.getByLabel('Network', { exact: true })).toHaveValue('arbitrum-sepolia');
   await openWallet(page);
   const address = mnemonicToAccount(words.join(' ')).address;
-  await expect(page.getByTestId('public-address')).toHaveText(address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', address);
   const stored = await storedText(page);
   expect(stored).toContain('occulta-wallet');
   expect(stored).not.toContain(words.slice(0, 2).join(' '));
@@ -89,7 +89,7 @@ test('creating a wallet: the phrase is shown once, 3 words must match, the passw
   await expect(page.getByRole('alert')).toHaveText('Wrong password');
   await page.getByLabel('Wallet password', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Unlock' }).click();
-  await expect(page.getByTestId('public-address')).toHaveText(address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', address);
   await page.getByRole('button', { name: 'Lock' }).click();
   await expect(page.getByRole('heading', { name: 'Unlock your wallet' })).toBeVisible();
 });
@@ -101,7 +101,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(phrase);
   await setPassword(page, 'Import wallet');
   await openWallet(page);
-  await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', mnemonicToAccount(phrase).address);
 
   await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
@@ -114,7 +114,7 @@ test('importing gives the same accounts as standard wallets; accounts can be add
   await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByLabel('Account', { exact: true }).selectOption(privateKeyToAccount(key).address);
   await openWallet(page);
-  await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', privateKeyToAccount(key).address);
 });
 
 test('a wallet imported from a private key has that address and cannot derive accounts', async ({ page }) => {
@@ -124,7 +124,7 @@ test('a wallet imported from a private key has that address and cannot derive ac
   await page.getByLabel('Recovery phrase or private key', { exact: true }).fill(key);
   await setPassword(page, 'Import wallet');
   await openWallet(page);
-  await expect(page.getByTestId('public-address')).toHaveText(privateKeyToAccount(key).address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', privateKeyToAccount(key).address);
   await openSettings(page);
   await expect(page.getByRole('button', { name: 'Import key' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add account' })).toHaveCount(0);
@@ -147,7 +147,7 @@ test('a forgotten password is replaced by importing the phrase, after a warning'
   await page.getByLabel('New wallet password', { exact: true }).fill('another password');
   await page.getByRole('button', { name: 'Reset wallet' }).click();
   await openWallet(page);
-  await expect(page.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
+  await expect(page.getByTestId('public-address')).toHaveAttribute('title', mnemonicToAccount(phrase).address);
   await expect(page.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(1); // the imported key is gone
 });
 
@@ -174,14 +174,16 @@ test('the export file restores the wallet in a fresh browser and records when it
   await other.getByLabel('Password of the export file', { exact: true }).fill(PASSWORD);
   await other.getByRole('button', { name: 'Restore' }).click();
   await openWallet(other);
-  await expect(other.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
+  await expect(other.getByTestId('public-address')).toHaveAttribute('title', mnemonicToAccount(phrase).address);
   await expect(other.getByLabel('Account', { exact: true }).locator('option')).toHaveCount(2);
   await fresh.close();
 });
 
 test('each account and each network keeps its own notes and channels; Settings keeps added relays and relayers', async ({ page }) => {
   await createWallet(page);
+  await expect(page.getByTestId('network-logo')).toBeVisible(); // a new wallet starts on Arbitrum Sepolia
   await useDevNetwork(page);
+  await expect(page.getByTestId('network-logo')).toHaveCount(0); // the dev chain shows no Arbitrum logo
   await fundPublicly(page, '1');
   await openAction(page, 'Deposit');
   await popup(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();

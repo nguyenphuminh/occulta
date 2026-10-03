@@ -1,6 +1,6 @@
 import { shieldedAddressOf } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
-import { SHIELDED_ADDRESS_TEXT } from '../../shared/addresses.ts';
+import { SHIELDED_ADDRESS_TEXT, shortAddress } from '../../shared/addresses.ts';
 import { formatAmount, tokenId, tokenName } from '../../shared/amounts.ts';
 import { DepositIcon, ReceiveIcon, SendIcon, ShieldIcon, WithdrawIcon } from '../../shared/icons.tsx';
 import { ActionLink, Button, Copy, ErrorNote, Notice, useAction, useLoad } from '../../shared/ui.tsx';
@@ -27,6 +27,18 @@ export function ShieldedHero() {
           Sync now
         </Button>
       </div>
+      <div className="hero-address">
+        <div className="detail-row">
+          <div className="row-main">
+            <span className="detail-label">Shielded address</span>
+            <span className="address mono" data-testid="shielded-address" title={address.data ?? undefined}>
+              {address.data ? shortAddress(address.data) : '…'}
+            </span>
+          </div>
+          {address.data ? <Copy text={address.data} label="Copy shielded address" className="ghost small on-dark" /> : null}
+        </div>
+        <p className="hero-note">{SHIELDED_ADDRESS_TEXT}</p>
+      </div>
       <div className="big-amounts">
         <span className="big" data-testid="shielded-eth">
           {formatAmount('eth', balances.get(0n) ?? 0n)}
@@ -44,16 +56,6 @@ export function ShieldedHero() {
         <ActionLink href="#/send" icon={<SendIcon />} label="Send" />
       </nav>
       <div className="hero-details">
-        <div className="detail-row">
-          <div className="row-main">
-            <span className="detail-label">Shielded address</span>
-            <span className="mono truncate" data-testid="shielded-address">
-              {address.data ?? '…'}
-            </span>
-          </div>
-          {address.data ? <Copy text={address.data} label="Copy shielded address" className="ghost small on-dark" /> : null}
-        </div>
-        <p className="hero-note">{SHIELDED_ADDRESS_TEXT}</p>
         <details className="notes">
           <summary>
             {notes.length} unspent {notes.length === 1 ? 'note' : 'notes'}

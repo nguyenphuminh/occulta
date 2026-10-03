@@ -93,7 +93,7 @@ export function devSend<T>(send: () => Promise<T>): Promise<T> {
 /** Sends test ETH (and optionally test USDG) to the active account's public address and returns it. */
 export async function fundPublicly(page: Page, eth: string, usdg?: string): Promise<Address> {
   await openWallet(page);
-  const address = (await page.getByTestId('public-address').textContent()) as Address;
+  const address = (await page.getByTestId('public-address').getAttribute('title')) as Address;
   await devSend(async () =>
     client.waitForTransactionReceipt({ hash: await dev.sendTransaction({ account: dev.account!, chain: devChain, to: address, value: parseEther(eth) }) }),
   );

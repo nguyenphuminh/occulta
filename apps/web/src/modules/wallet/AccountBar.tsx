@@ -1,7 +1,19 @@
+import type { SelectHTMLAttributes } from 'react';
 import { useApp } from '../../app/context.ts';
 import { startNode } from '../../app/settings.ts';
 import { LockIcon } from '../../shared/icons.tsx';
+import { networkLogo } from '../../shared/networks.ts';
 import { ErrorNote, Field, useAction } from '../../shared/ui.tsx';
+
+/** A select with a logo at its start; it takes the field's id, so the field's label still names it. */
+function LogoSelect({ logo, ...select }: SelectHTMLAttributes<HTMLSelectElement> & { logo: string | null }) {
+  return (
+    <span className="logo-select">
+      {logo ? <img className="logo-select-logo" src={logo} alt="" data-testid="network-logo" /> : null}
+      <select {...select} className={logo ? 'has-logo' : undefined} />
+    </span>
+  );
+}
 
 /** The active account and network (BRD 2.2.14.2, 2.2.14.5) and the Lock button (2.2.14.3). */
 export function AccountBar() {
@@ -25,13 +37,13 @@ export function AccountBar() {
         </select>
       </Field>
       <Field label="Network">
-        <select value={wallet.networkId()} disabled={change.busy} onChange={(e) => void change.perform(() => wallet.setNetwork(e.target.value))}>
+        <LogoSelect logo={networkLogo(occulta.network())} value={wallet.networkId()} disabled={change.busy} onChange={(e) => void change.perform(() => wallet.setNetwork(e.target.value))}>
           {occulta.networks().map((n) => (
             <option key={n.id} value={n.id}>
               {n.name}
             </option>
           ))}
-        </select>
+        </LogoSelect>
       </Field>
       <button type="button" className="ghost lock" aria-label="Lock" onClick={() => void lock()}>
         <LockIcon />

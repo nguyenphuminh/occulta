@@ -235,6 +235,31 @@ svg {
   border: 1px solid var(--line);
 }
 
+/* Arbitrum's brand kit: the logomark at 24px at least, clear of other marks by half its width. */
+.logo-select {
+  position: relative;
+  display: block;
+}
+
+.logo-select-logo {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: 24px;
+  height: auto;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.logo-select select.has-logo {
+  padding-left: 50px;
+}
+
+/* Small enough for "Arbitrum Sepolia" beside its logo in the sidebar. */
+.account-bar select {
+  font-size: 0.9rem;
+}
+
 .account-bar .field > label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -590,6 +615,25 @@ svg {
 
 .notes[open] summary {
   margin-bottom: 4px;
+}
+
+.hero-address {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hero-address .row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The address others pay: short, and easy to read. */
+.hero-address .address {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .hero-details {

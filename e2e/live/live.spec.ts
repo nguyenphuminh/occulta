@@ -69,7 +69,9 @@ test('wallet basics: a new wallet opens on Channels with the live relays, locks,
   const { page, phrase } = await newUser(browser, 'basics');
   await expect(page.getByRole('heading', { name: 'Channels', level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Invite', exact: true })).toBeVisible(); // a relay is known on Arbitrum Sepolia
+  await expect(page.getByTestId('network-logo')).toBeVisible();
   await openSettings(page, 'Network');
+  for (const url of defaultRpcUrls(network)) await expect(card(page, 'RPC endpoints on Arbitrum Sepolia').getByRole('listitem').filter({ hasText: url })).toContainText('Network default');
   await expect(card(page, 'Transaction relayers on Arbitrum Sepolia').getByRole('listitem').filter({ hasText: RELAYER })).toContainText('Network default');
   await expect(card(page, 'libp2p relays on Arbitrum Sepolia').getByRole('listitem').filter({ hasText: RELAY })).toContainText('Network default');
   await page.getByRole('button', { name: 'Lock' }).click();
@@ -81,7 +83,7 @@ test('wallet basics: a new wallet opens on Channels with the live relays, locks,
   await other.getByLabel('Recovery phrase or private key', { exact: true }).fill(phrase);
   await setPassword(other, 'Import wallet');
   await openWallet(other);
-  await expect(other.getByTestId('public-address')).toHaveText(mnemonicToAccount(phrase).address);
+  await expect(other.getByTestId('public-address')).toHaveAttribute('title', mnemonicToAccount(phrase).address);
 });
 
 test('on a phone: the welcome screen, a new wallet and the bottom tabs', async ({ browser }) => {
@@ -107,7 +109,7 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     [alice, bob] = await Promise.all([newUser(browser, 'alice'), newUser(browser, 'bob')]);
     bobPage = bob.page;
     await openWallet(alice.page);
-    await fund((await alice.page.getByTestId('public-address').textContent()) as `0x${string}`, '0.016', '2');
+    await fund((await alice.page.getByTestId('public-address').getAttribute('title')) as `0x${string}`, '0.016', '2');
   });
 
   test.afterAll(async () => {
@@ -161,7 +163,7 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     await expect(a.getByTestId('shielded-usdg')).toHaveText('1 USDG');
 
     await openWallet(bobPage);
-    const bobShielded = (await bobPage.getByTestId('shielded-address').textContent()) as string;
+    const bobShielded = (await bobPage.getByTestId('shielded-address').getAttribute('title')) as string;
     for (const [token, amount, fee] of [
       ['eth', '0.003', '0.0001 ETH'],
       ['usdg', '0.5', '0.01 USDG'],

@@ -1,5 +1,5 @@
 import { useApp } from '../../app/context.ts';
-import { PUBLIC_ADDRESS_TEXT } from '../../shared/addresses.ts';
+import { PUBLIC_ADDRESS_TEXT, shortAddress } from '../../shared/addresses.ts';
 import { formatAmount, tokenId } from '../../shared/amounts.ts';
 import { EyeIcon } from '../../shared/icons.tsx';
 import { Copy, ErrorNote, useLoad } from '../../shared/ui.tsx';
@@ -30,6 +30,18 @@ export function PublicCard() {
           <EyeIcon /> Public balance · visible on-chain
         </span>
       </div>
+      <div className="hero-address">
+        <div className="detail-row">
+          <div className="row-main">
+            <span className="detail-label">Public address</span>
+            <span className="address mono" data-testid="public-address" title={address}>
+              {shortAddress(address)}
+            </span>
+          </div>
+          <Copy text={address} label="Copy address" />
+        </div>
+        <p className="hero-note">{PUBLIC_ADDRESS_TEXT}</p>
+      </div>
       <div className="big-amounts">
         <span className="big" data-testid="public-eth">
           {balances.data ? formatAmount('eth', balances.data.eth) : '…'}
@@ -39,18 +51,6 @@ export function PublicCard() {
         </span>
       </div>
       <ErrorNote error={balances.error} />
-      <div className="hero-details">
-        <div className="detail-row">
-          <div className="row-main">
-            <span className="detail-label">Public address</span>
-            <span className="mono truncate" data-testid="public-address">
-              {address}
-            </span>
-          </div>
-          <Copy text={address} label="Copy address" />
-        </div>
-        <p className="hero-note">{PUBLIC_ADDRESS_TEXT}</p>
-      </div>
     </section>
   );
 }

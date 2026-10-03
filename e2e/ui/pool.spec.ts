@@ -40,8 +40,10 @@ test('public funds, and deposit, private transfer, receive and withdrawal as dia
 
   // Private transfer to Bob's shielded address; the relayer's fee is shown before submitting.
   await openWallet(bob);
-  await expect(bob.getByTestId('shielded-address')).toHaveText(/^occ[0-9a-f]{136}$/);
-  const bobShielded = (await bob.getByTestId('shielded-address').textContent()) as string;
+  // Shown short, as wallets show addresses; the whole of it is copied.
+  await expect(bob.getByTestId('shielded-address')).toHaveText(/^occ[0-9a-f]{8}…[0-9a-f]{8}$/);
+  await expect(bob.getByTestId('shielded-address')).toHaveAttribute('title', /^occ[0-9a-f]{136}$/);
+  const bobShielded = (await bob.getByTestId('shielded-address').getAttribute('title')) as string;
   await openAction(alice, 'Send');
   const transfer = popup(alice, 'Private transfer');
   await transfer.getByLabel('To shielded address', { exact: true }).fill(bobShielded);
@@ -90,8 +92,8 @@ test('USDG: public balance, deposit with approval, private transfer, withdrawal 
   await expect(alice.getByText('1 unspent note', { exact: true })).toBeVisible();
 
   await openWallet(bob);
-  await expect(bob.getByTestId('shielded-address')).toHaveText(/^occ/);
-  const bobShielded = (await bob.getByTestId('shielded-address').textContent()) as string;
+  await expect(bob.getByTestId('shielded-address')).toHaveAttribute('title', /^occ/);
+  const bobShielded = (await bob.getByTestId('shielded-address').getAttribute('title')) as string;
   await openAction(alice, 'Send'); // the shielded balance's Send is the private transfer
   const transfer = popup(alice, 'Private transfer');
   await transfer.getByLabel('To shielded address', { exact: true }).fill(bobShielded);
