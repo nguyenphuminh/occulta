@@ -97,9 +97,9 @@ configuration points at it:
 | Groth16 verifier | `0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770` |
 | Poseidon hasher | `0x154052BAD5D2D3c79d31FDF731E46586144646F2` |
 
-It still lists no transaction relayers or libp2p relays: until some are published, users add their
-own (e.g. a desktop client) in the website's settings. Arbitrum One and the Robinhood chains are not
-deployed yet. Deploying needs a funded deployer key on each chain:
+It lists the live relay host below (`https://relay.occulta.space`, one desktop client that is both
+transaction relayer and libp2p relay); users can add their own in the website's settings. Arbitrum
+One and the Robinhood chains are not deployed yet. Deploying needs a funded deployer key on each chain:
 
 ```sh
 OCCULTA_DEPLOYER_KEY=0x… npm run deploy:network -- --network arbitrum-sepolia
@@ -108,6 +108,29 @@ OCCULTA_DEPLOYER_KEY=0x… npm run deploy:network -- --network arbitrum-sepolia
 It deploys the production build (3–7 day dispute window) against the chain's real USDG and prints a
 `contracts` block: add it to the network's entry in `chain.config.ts`, and list the transaction
 relayers and libp2p relays that serve that network.
+
+## Live deployment
+
+The website runs at **https://occulta.space** (Cloudflare, Workers static assets) and the relay host
+at **relay.occulta.space** (one Google Cloud e2-small VM: the desktop client as relayer and libp2p
+relay for Arbitrum Sepolia, behind Caddy with automatic HTTPS). One command deploys the current commit
+and is safe to run again:
+
+```sh
+npm run deploy:live -- --project occulta-space
+```
+
+It needs a clean git tree, a signed-in `gcloud` (`~/.local/opt/google-cloud-sdk/bin/gcloud auth login`)
+and Cloudflare's browser sign-ins (`npx wrangler login`, then `~/.local/bin/cloudflared tunnel login`
+choosing occulta.space), or an API token in `~/.occulta-secrets/cloudflare.token`. It creates what is
+missing (the relay's wallet in `.occulta/live/`, a static IP, firewall rule, VM, the DNS record), tops
+up the relayer's gas from `~/.occulta-secrets/funder.key` when that file exists, installs the release,
+deploys the website, and checks the relayer over HTTPS and a relay reservation from outside.
+
+`npm run test:live` then runs the user flows in a browser against the live site with real Sepolia
+transactions, paid from the funder key and swept back at the end; each test wallet's phrase is kept in
+`.occulta/live/test-wallets.jsonl` in case a run leaves money behind. Finishing a dispute needs the
+contracts' 3–7 day window, so live runs only start one; the rest is covered on the dev chain.
 
 ## Gas (dev node, measured by the integration tests)
 
