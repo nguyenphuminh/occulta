@@ -1083,6 +1083,11 @@ button.icon-button {
   padding: 24px 20px 14px;
 }
 
+.channel-reminder {
+  margin: 0 12px 8px;
+  font-size: 0.8rem;
+}
+
 .channel-list-head .page-actions {
   margin-left: 0;
 }

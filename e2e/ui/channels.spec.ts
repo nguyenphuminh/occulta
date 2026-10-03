@@ -63,6 +63,9 @@ test('a channel from an invite link: open with a nickname, pay both ways with co
   const bobChannel = await openChannel(bob);
   await expect(aliceChannel).toContainText('Live');
   await expect(bobChannel).toContainText('Live');
+  // With a channel open, the wallet reminds her to come back within each dispute window.
+  const reminder = alice.getByText('Open Occulta at least every few days while you have open channels.');
+  await expect(reminder).toBeVisible();
   await expect(aliceChannel.getByTestId('channel-mine')).toHaveText('0.0499 ETH');
   await expect(aliceChannel.getByRole('heading', { level: 2 })).toContainText('Bob');
   await expect(alice.getByTestId('channel-item').first()).toContainText('Bob');
@@ -100,6 +103,7 @@ test('a channel from an invite link: open with a nickname, pay both ways with co
   await confirmRelayed(alice, 'Close channel');
   await expect(aliceChannel).toContainText('Closed');
   await expect(bobChannel).toContainText('Closed');
+  await expect(reminder).toHaveCount(0); // no open channel left
   await openWallet(bob);
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.008 ETH');
 });

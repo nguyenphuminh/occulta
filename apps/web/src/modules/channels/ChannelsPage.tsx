@@ -11,6 +11,9 @@ import { RequestConversation } from './requests.tsx';
 import { PENDING_TEXT, STATUS_TEXT, peerName } from './status.ts';
 import { timelineOf } from './timeline.ts';
 
+/** Channels the other side could try to close with an old balance, which the wallet answers only while open. */
+const OPEN_STATUSES: readonly string[] = ['funding', 'live', 'closing', 'disputing'];
+
 /** What the channels screen shows: the list alone, a channel beside it, or a dialog over it. */
 export type ChannelsView = { kind: 'none' } | { kind: 'channel'; id: string } | { kind: 'invite' } | { kind: 'open'; invite: string };
 
@@ -90,6 +93,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
   const selectedRequest = view.kind === 'channel' ? requests.find((r) => r.prompt.request.channelId === view.id) : undefined;
   const selectedPending = view.kind === 'channel' ? pending.find((p) => p.id === view.id) : undefined;
   const hasFunds = [...occulta.pool.balances().values()].some((v) => v > 0n);
+  const hasOpenChannels = list.some((r) => OPEN_STATUSES.includes(r.status));
   return (
     <div className={view.kind === 'channel' ? 'channels has-detail' : 'channels'} data-version={version}>
       <section className="channel-list" aria-label="Your channels">
@@ -104,6 +108,12 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
             </a>
           </div>
         </header>
+        {hasOpenChannels ? (
+          // BRD 2.2.14: there is no watchtower yet, so the wallet must be opened within each dispute window.
+          <p className="notice channel-reminder" role="note">
+            Open Occulta at least every few days while you have open channels. If the other side tries to close with an old balance, your wallet has 7 days to answer, and it can only answer while it is open.
+          </p>
+        ) : null}
         {list.length === 0 && pending.length === 0 && requests.length === 0 ? (
           <div className="empty">
             <ChannelsIcon />
