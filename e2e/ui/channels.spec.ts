@@ -19,6 +19,7 @@ import {
   openSettings,
   openWallet,
   payInChannel as pay,
+  popup,
   profiled,
   recordConsole,
   unlock,
@@ -32,7 +33,7 @@ async function userWithShieldedEth(browser: Browser, eth: '0.1' | '1'): Promise<
   await useDevNetwork(page);
   await fundPublicly(page, '1');
   await openAction(page, 'Deposit');
-  const deposit = card(page, 'Deposit');
+  const deposit = popup(page, 'Deposit');
   await deposit.getByRole('button', { name: eth, exact: true }).click();
   await deposit.getByRole('button', { name: 'Deposit' }).click();
   await expect(page.getByTestId('shielded-eth')).toHaveText(`${eth} ETH`);
@@ -148,7 +149,7 @@ test('a USDG channel from a pasted invite code; a locked wallet signs nothing un
   await useDevNetwork(alice);
   await fundPublicly(alice, '1', '100');
   await openAction(alice, 'Deposit');
-  const deposit = card(alice, 'Deposit');
+  const deposit = popup(alice, 'Deposit');
   await deposit.getByLabel('Token', { exact: true }).selectOption('usdg');
   await deposit.getByRole('button', { name: '10', exact: true }).click();
   await deposit.getByRole('button', { name: 'Deposit' }).click();
@@ -236,7 +237,7 @@ test('a restored export keeps its notes, nicknames and a live channel, which can
   await expect(bobChannel.getByRole('heading', { level: 2 })).toHaveText('Alice');
 
   // Bob exports and continues in a fresh browser; the old one is gone.
-  await openSettings(bob);
+  await openSettings(bob, 'Backup');
   const downloading = bob.waitForEvent('download');
   await card(bob, 'Export').getByRole('button', { name: 'Download export file' }).click();
   const file = join(tmpdir(), `occulta-export-${Date.now()}.json`);

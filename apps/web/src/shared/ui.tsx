@@ -155,12 +155,12 @@ export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?
   return <p className={`notice ${tone}`}>{children}</p>;
 }
 
-export function Copy({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function Copy({ text, label = 'Copy', className = 'secondary small' }: { text: string; label?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
-      className="secondary small"
+      className={className}
       onClick={() => {
         void navigator.clipboard?.writeText(text).catch(() => undefined);
         setCopied(true);
@@ -181,14 +181,19 @@ export function Qr({ text, label }: { text: string; label: string }) {
   return src ? <img className="qr" src={src} alt={label} width={192} height={192} /> : null;
 }
 
+/** Closes a dialog that has its own address in the URL by going back to the page under it. */
+export const closeTo = (hash: string) => () => {
+  location.hash = hash;
+};
+
 /**
  * A dialog: a sheet that slides up on phones, a centred panel on wide screens. It is rendered at the
  * end of the body, so an animated (transformed) ancestor cannot confine its backdrop.
  */
-export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose?: () => void }) {
+export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
   return createPortal(
     <div className="backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={wide ? 'modal wide' : 'modal'} role="dialog" aria-modal="true" aria-label={title}>
         <span className="grabber" aria-hidden="true" />
         <div className="modal-head">
           <h2>{title}</h2>

@@ -1,7 +1,7 @@
 import { shieldedAddressOf } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { PUBLIC_ADDRESS_TEXT, SHIELDED_ADDRESS_TEXT } from '../../shared/addresses.ts';
-import { Card, Copy, Notice, Page, Qr, useLoad } from '../../shared/ui.tsx';
+import { Copy, Modal, Notice, Qr, closeTo, useLoad } from '../../shared/ui.tsx';
 
 /** Both ways to get paid: the shielded address for private payments, the public one for funds from other wallets. */
 export function Receive() {
@@ -9,9 +9,10 @@ export function Receive() {
   const account = occulta.wallet.activeAccount();
   const shielded = useLoad(async () => shieldedAddressOf(await occulta.keys.poolKeys()), account.id);
   return (
-    <Page title="Receive" back="#/wallet">
-      <div className="grid two">
-        <Card title="Private payments">
+    <Modal title="Receive" wide onClose={closeTo('#/wallet')}>
+      <div className="receive">
+        <section className="receive-part" aria-label="Private payments">
+          <h3>Private payments</h3>
           <Notice>{SHIELDED_ADDRESS_TEXT}</Notice>
           {shielded.data ? (
             <>
@@ -22,14 +23,15 @@ export function Receive() {
           ) : (
             <p className="muted">…</p>
           )}
-        </Card>
-        <Card title="Public address" className="public-card">
+        </section>
+        <section className="receive-part public" aria-label="Public address">
+          <h3>Public address</h3>
           <Notice>{PUBLIC_ADDRESS_TEXT}</Notice>
           <Qr text={account.address} label="Address QR code" />
           <p className="mono break">{account.address}</p>
           <Copy text={account.address} label="Copy address" />
-        </Card>
+        </section>
       </div>
-    </Page>
+    </Modal>
   );
 }

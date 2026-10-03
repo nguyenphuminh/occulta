@@ -1,13 +1,18 @@
+import { shieldedAddressOf } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
-import { formatAmount, tokenId } from '../../shared/amounts.ts';
+import { SHIELDED_ADDRESS_TEXT } from '../../shared/addresses.ts';
+import { formatAmount, tokenId, tokenName } from '../../shared/amounts.ts';
 import { DepositIcon, ReceiveIcon, SendIcon, ShieldIcon, WithdrawIcon } from '../../shared/icons.tsx';
-import { ActionLink, Button, ErrorNote, Notice, useAction } from '../../shared/ui.tsx';
+import { ActionLink, Button, Copy, ErrorNote, Notice, useAction, useLoad } from '../../shared/ui.tsx';
 
-/** The shielded balance (BRD 2.2.1–2.2.5) and the actions that move it. */
+/** The shielded balance (BRD 2.2.1–2.2.5) with everything that belongs to it: its actions, the address others pay, the notes. */
 export function ShieldedHero() {
   const { occulta, refresh } = useApp();
   const network = occulta.network();
+  const account = occulta.wallet.activeAccount();
   const balances = occulta.pool.balances();
+  const notes = occulta.pool.notes().filter((n) => !n.spent);
+  const address = useLoad(async () => shieldedAddressOf(await occulta.keys.poolKeys()), account.id);
   const sync = useAction(async () => {
     await occulta.pool.sync();
     refresh();
@@ -38,6 +43,37 @@ export function ShieldedHero() {
         <ActionLink href="#/receive" icon={<ReceiveIcon />} label="Receive" />
         <ActionLink href="#/send" icon={<SendIcon />} label="Send" />
       </nav>
+      <div className="hero-details">
+        <div className="detail-row">
+          <div className="row-main">
+            <span className="detail-label">Shielded address</span>
+            <span className="mono truncate" data-testid="shielded-address">
+              {address.data ?? '…'}
+            </span>
+          </div>
+          {address.data ? <Copy text={address.data} label="Copy shielded address" className="ghost small on-dark" /> : null}
+        </div>
+        <p className="hero-note">{SHIELDED_ADDRESS_TEXT}</p>
+        <details className="notes">
+          <summary>
+            {notes.length} unspent {notes.length === 1 ? 'note' : 'notes'}
+          </summary>
+          {notes.length > 0 ? (
+            <ul className="rows">
+              {notes.map((n) => (
+                <li key={n.commitment.toString()} className="row-item">
+                  <div className="row-main">
+                    <strong>{formatAmount(tokenName(n.token), n.amount)}</strong>
+                    <span className="hero-note">{n.secret === 'spending' ? `Note #${n.leafIndex}` : `Channel payout · note #${n.leafIndex}`}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="hero-note">Deposits and payments you receive become notes.</p>
+          )}
+        </details>
+      </div>
     </section>
   );
 }

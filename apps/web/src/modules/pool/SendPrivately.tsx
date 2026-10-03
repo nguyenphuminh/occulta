@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { decodeShieldedAddress } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
-import { AmountField, Card, Field, Page, RelayedSubmit } from '../../shared/ui.tsx';
+import { AmountField, Field, Modal, RelayedSubmit, closeTo } from '../../shared/ui.tsx';
 import { TokenSelect } from '../public/index.ts';
 
 function isShieldedAddress(text: string): boolean {
@@ -22,8 +22,7 @@ export function SendPrivately() {
   const [token, setToken] = useState<TokenName>('eth');
   const [amount, setAmount] = useState('');
   return (
-    <Page title="Private transfer">
-      <Card title="Send to a shielded address">
+    <Modal title="Private transfer" onClose={closeTo('#/wallet')}>
         <p className="muted small">Pays someone inside the pool from your shielded balance. Nobody else can see the amount or who paid whom. For repeated payments to the same person, a channel is faster and cheaper.</p>
         <Field label="To shielded address">
           <input value={to} spellCheck={false} placeholder="occ…" onChange={(e) => setTo(e.target.value.trim())} />
@@ -48,7 +47,6 @@ export function SendPrivately() {
             location.hash = '#/wallet';
           }}
         />
-      </Card>
-    </Page>
+    </Modal>
   );
 }

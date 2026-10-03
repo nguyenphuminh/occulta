@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { balanceOf, sideOf, type ChannelRecord, type ChannelService } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { formatAmount, parseAmount, SYMBOL, tokenId, tokenName } from '../../shared/amounts.ts';
@@ -39,6 +39,12 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
     refresh();
   });
   const live = record.status === 'live';
+  const entries = timelineOf(record);
+  const timeline = useRef<HTMLOListElement>(null);
+  // The newest payment stays in view, as in a chat.
+  useEffect(() => {
+    timeline.current?.scrollTo({ top: timeline.current.scrollHeight });
+  }, [entries.length]);
   return (
     <section className="conversation" aria-label="Channel" data-testid={`channel-${record.id}`}>
       <header className="conversation-head">
@@ -84,48 +90,50 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
         <span className={`pill status-${record.status}`}>{STATUS_TEXT[record.status]}</span>
       </header>
 
-      <dl className="balance-strip">
-        <div>
-          <dt>Your balance</dt>
-          <dd data-testid="channel-mine">{formatAmount(token, balanceOf(s, me))}</dd>
-        </div>
-        <div>
-          <dt>Their balance</dt>
-          <dd data-testid="channel-theirs">{formatAmount(token, balanceOf(s, me === 0 ? 1 : 0))}</dd>
-        </div>
-        <div>
-          <dt>Closing fee</dt>
-          <dd>{formatAmount(token, s.closingFee)}</dd>
-        </div>
-      </dl>
+      <div className="channel-strip">
+        <dl className="balance-strip">
+          <div>
+            <dt>Your balance</dt>
+            <dd data-testid="channel-mine">{formatAmount(token, balanceOf(s, me))}</dd>
+          </div>
+          <div>
+            <dt>Their balance</dt>
+            <dd data-testid="channel-theirs">{formatAmount(token, balanceOf(s, me === 0 ? 1 : 0))}</dd>
+          </div>
+          <div>
+            <dt>Closing fee</dt>
+            <dd>{formatAmount(token, s.closingFee)}</dd>
+          </div>
+        </dl>
 
-      <div className="channel-actions">
-        {record.status === 'live' || record.status === 'closing' ? (
-          <RelayedSubmit
-            label="Close channel"
-            className="secondary small"
-            token={token}
-            tokenId={tokenId(token, network)}
-            relayer={() => occulta.relayer()}
-            details={<p>Close cooperatively with the current balances. The closing fee becomes the relayer&apos;s current fee; any difference comes from your side.</p>}
-            run={(relayer) => channels.close(record.id, relayer)}
-            onDone={refresh}
-          />
-        ) : null}
-        {['funding', 'live', 'closing'].includes(record.status) ? (
-          <Button className="danger small" onClick={() => setDisputing(true)}>
-            Close without the other side
-          </Button>
-        ) : null}
-        {record.status === 'disputing' ? (
-          <Button className="secondary small" busy={check.busy} onClick={() => void check.perform()}>
-            Check dispute now
-          </Button>
-        ) : null}
+        <div className="channel-actions">
+          {record.status === 'live' || record.status === 'closing' ? (
+            <RelayedSubmit
+              label="Close channel"
+              className="secondary small"
+              token={token}
+              tokenId={tokenId(token, network)}
+              relayer={() => occulta.relayer()}
+              details={<p>Close cooperatively with the current balances. The closing fee becomes the relayer&apos;s current fee; any difference comes from your side.</p>}
+              run={(relayer) => channels.close(record.id, relayer)}
+              onDone={refresh}
+            />
+          ) : null}
+          {['funding', 'live', 'closing'].includes(record.status) ? (
+            <Button className="danger small" onClick={() => setDisputing(true)}>
+              Close without the other side
+            </Button>
+          ) : null}
+          {record.status === 'disputing' ? (
+            <Button className="secondary small" busy={check.busy} onClick={() => void check.perform()}>
+              Check dispute now
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <ol className="timeline">
-        {timelineOf(record).map((entry, i) =>
+      <ol className="timeline" ref={timeline}>
+        {entries.map((entry, i) =>
           entry.kind === 'payment' ? (
             <li key={i} className={entry.outgoing ? 'bubble out' : 'bubble in'}>
               <span className="bubble-label">{entry.outgoing ? 'You paid' : 'You received'}</span>
@@ -147,6 +155,7 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
         <p className="notice">While your wallet is unlocked, it answers an old state with your latest one, finalizes after the deadline and reclaims what is yours.</p>
       ) : null}
 
+      <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error} />
       <div className="composer">
         <label className="composer-field">
           <span className="sr-only">Pay ({SYMBOL[token]})</span>
@@ -163,7 +172,6 @@ export function Conversation({ record, channels, names }: { record: ChannelRecor
           <SendIcon />
         </Button>
       </div>
-      <ErrorNote error={pay.error ?? dispute.error ?? check.error ?? rename.error} />
 
       {disputing ? (
         <Modal title="Close without the other side">

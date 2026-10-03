@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ETH_PRESETS, USDG_PRESETS } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
-import { AmountField, Button, Card, ErrorNote, Notice, Page, useAction } from '../../shared/ui.tsx';
+import { AmountField, Button, ErrorNote, Modal, Notice, closeTo, useAction } from '../../shared/ui.tsx';
 import { TokenSelect } from '../public/index.ts';
 
 export const presetsOf = (token: TokenName) => (token === 'eth' ? ETH_PRESETS : USDG_PRESETS);
@@ -20,8 +20,7 @@ export function Deposit() {
     location.hash = '#/wallet';
   });
   return (
-    <Page title="Deposit" back="#/wallet">
-      <Card title="Deposit">
+    <Modal title="Deposit" onClose={closeTo('#/wallet')}>
         <Notice>Moves public funds of this account into the pool. The account pays the gas; USDG is approved first.</Notice>
         <TokenSelect value={token} onChange={setToken} />
         <AmountField label="Amount" token={token} value={amount} onChange={setAmount} presets={presetsOf(token)} />
@@ -29,7 +28,6 @@ export function Deposit() {
           Deposit
         </Button>
         <ErrorNote error={deposit.error} />
-      </Card>
-    </Page>
+    </Modal>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { isAddress } from 'viem';
 import { useApp } from '../../app/context.ts';
 import { parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
-import { AmountField, Card, Field, Notice, Page, RelayedSubmit } from '../../shared/ui.tsx';
+import { AmountField, Field, Modal, Notice, RelayedSubmit, closeTo } from '../../shared/ui.tsx';
 import { TokenSelect } from '../public/index.ts';
 import { presetsOf } from './Deposit.tsx';
 
@@ -15,8 +15,7 @@ export function Withdraw() {
   const [address, setAddress] = useState('');
   const [done, setDone] = useState<string | null>(null);
   return (
-    <Page title="Withdraw" back="#/wallet">
-      <Card title="Withdraw">
+    <Modal title="Withdraw" onClose={closeTo('#/wallet')}>
         <TokenSelect value={token} onChange={setToken} />
         <AmountField label="Amount" token={token} value={amount} onChange={setAmount} presets={presetsOf(token)} />
         <Field label="Recipient address" hint="Use an address with no history linking it to you, for example a new account in MetaMask.">
@@ -44,7 +43,6 @@ export function Withdraw() {
           }}
         />
         {done ? <Notice tone="ok">Withdrawn to {done}.</Notice> : null}
-      </Card>
-    </Page>
+    </Modal>
   );
 }

@@ -36,18 +36,19 @@ export async function openWallet(page: Page): Promise<void> {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'My wallet' }).click();
 }
 
-/** Opens one of the shielded balance's actions on My wallet; Send leads to the Private transfer page. */
+/** Opens one of the shielded balance's actions on My wallet; each is a dialog over it (Send is the private transfer). */
 export async function openAction(page: Page, name: 'Deposit' | 'Withdraw' | 'Receive' | 'Send'): Promise<void> {
   await openWallet(page);
   await page.getByRole('navigation', { name: 'Shielded actions' }).getByRole('link', { name, exact: true }).click();
 }
 
-export async function openTransfer(page: Page): Promise<void> {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Private transfer' }).click();
-}
+/** A dialog by its exact title (so Withdraw is not its own review, Confirm: Withdraw). */
+export const popup = (page: Page, title: string): Locator => page.getByRole('dialog', { name: title, exact: true });
 
-export async function openSettings(page: Page): Promise<void> {
+/** Opens Settings, and one of its categories (Accounts shows when none is chosen). */
+export async function openSettings(page: Page, category?: 'Accounts' | 'Backup' | 'Network'): Promise<void> {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings' }).click();
+  if (category) await page.getByRole('navigation', { name: 'Settings categories' }).getByRole('link', { name: new RegExp(`^${category}`) }).click();
 }
 
 export async function openChannels(page: Page): Promise<void> {

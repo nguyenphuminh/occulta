@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { decodeInvite, inviteLink, shieldedAddressOf } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
-import { AmountField, Button, Copy, ErrorNote, Field, Modal, Notice, Qr, RelayedSubmit, useAction } from '../../shared/ui.tsx';
+import { AmountField, Button, Copy, ErrorNote, Field, Modal, Notice, Qr, RelayedSubmit, closeTo, useAction } from '../../shared/ui.tsx';
 import { TokenSelect } from '../public/index.ts';
 import { MAX_NICKNAME, setNickname } from './nicknames.ts';
 
@@ -15,9 +15,7 @@ function isInvite(text: string): boolean {
   }
 }
 
-const closeToList = () => {
-  location.hash = '#/channels';
-};
+const closeToList = closeTo('#/channels');
 
 /** BRD 2.2.6: an invite for one person to reach this wallet through a relay, made as soon as it is asked for. */
 export function InviteDialog() {

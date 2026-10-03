@@ -22,7 +22,10 @@ function lastLine(channels: ChannelService, id: string): string {
   return entry.text;
 }
 
-/** BRD 2.2.6–2.2.10 on the website: channels as conversations, the product's main screen. */
+/**
+ * BRD 2.2.6–2.2.10 on the website, laid out like a messaging app: the list of channels beside the
+ * open one, both the full height of the screen; on phones the list, then the channel on its own.
+ */
 export function ChannelsPage({ view }: { view: ChannelsView }) {
   const { occulta, version } = useApp();
   let channels: ChannelService;
@@ -45,7 +48,7 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
   return (
     <div className={view.kind === 'channel' ? 'channels has-detail' : 'channels'} data-version={version}>
       <section className="channel-list" aria-label="Your channels">
-        <header className="page-head">
+        <header className="channel-list-head">
           <h1>Channels</h1>
           <div className="page-actions">
             <a className="pill-link" href="#/channels/invite">
@@ -92,18 +95,33 @@ export function ChannelsPage({ view }: { view: ChannelsView }) {
           </ul>
         )}
       </section>
-      {view.kind === 'channel' ? (
-        <div className="channel-detail">
-          {selected ? (
-            <Conversation key={selected.id} record={selected} channels={channels} names={names} />
-          ) : (
-            <div className="empty wide">
+      <div className="channel-detail">
+        {selected ? (
+          <Conversation key={selected.id} record={selected} channels={channels} names={names} />
+        ) : (
+          <div className="chat-placeholder">
+            <span className="chat-placeholder-icon">
               <ChannelsIcon />
+            </span>
+            {view.kind === 'channel' ? (
               <p>This channel is not in this account on this network.</p>
-            </div>
-          )}
-        </div>
-      ) : null}
+            ) : (
+              <>
+                <h2>Your channels</h2>
+                <p className="muted">Pick a channel to see its payments, or start one: payments in a channel are instant and private.</p>
+                <div className="row">
+                  <a className="pill-link primary" href="#/channels/new">
+                    Open a channel
+                  </a>
+                  <a className="pill-link" href="#/channels/invite">
+                    Share your invite
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       {view.kind === 'invite' ? <InviteDialog /> : null}
       {view.kind === 'open' ? <OpenDialog key={view.invite} initialInvite={view.invite} /> : null}
     </div>

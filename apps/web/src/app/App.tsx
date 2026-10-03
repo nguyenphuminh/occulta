@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChannelsPage, type ChannelsView } from '../modules/channels/index.ts';
-import { MyWallet } from '../modules/home/index.ts';
+import { MyWallet, type WalletDialog } from '../modules/home/index.ts';
 import { Onboarding, PhraseBanner, TAGLINE, Unlock } from '../modules/onboarding/index.ts';
-import { Deposit, SendPrivately, Withdraw } from '../modules/pool/index.ts';
-import { Receive } from '../modules/public/index.ts';
-import { Settings } from '../modules/settings/index.ts';
+import { Settings, type SettingsCategory } from '../modules/settings/index.ts';
 import { AccountBar } from '../modules/wallet/index.ts';
-import { ChannelsIcon, Logo, SendIcon, SettingsIcon, WalletIcon } from '../shared/icons.tsx';
+import { ChannelsIcon, Logo, SettingsIcon, WalletIcon } from '../shared/icons.tsx';
 import { errorText } from '../shared/ui.tsx';
 import { AppContext, type AppContextValue } from './context.ts';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
@@ -18,11 +16,10 @@ import { startNode } from './settings.ts';
 /** How often the unlocked wallet syncs, moves channels forward and watches disputes. */
 const TICK_MS = Number(import.meta.env.VITE_OCCULTA_TICK_MS ?? 10_000);
 
-type Route =
-  | { section: 'channels'; view: ChannelsView }
-  | { section: 'wallet'; page: 'wallet' | 'deposit' | 'withdraw' | 'receive' }
-  | { section: 'transfer' }
-  | { section: 'settings' };
+type Route = { section: 'channels'; view: ChannelsView } | { section: 'wallet'; dialog: WalletDialog | null } | { section: 'settings'; category: SettingsCategory | null };
+
+const WALLET_DIALOGS: readonly string[] = ['deposit', 'withdraw', 'receive', 'send'] satisfies WalletDialog[];
+const SETTINGS_CATEGORIES: readonly string[] = ['accounts', 'backup', 'network'] satisfies SettingsCategory[];
 
 /** Channels are the product, so they are also where the app opens. */
 function routeOf(path: string): Route {
@@ -30,10 +27,12 @@ function routeOf(path: string): Route {
   if (path === '/channels/new') return { section: 'channels', view: { kind: 'open', invite: '' } };
   if (path === '/channels/invite') return { section: 'channels', view: { kind: 'invite' } };
   if (path.startsWith('/channels/')) return { section: 'channels', view: { kind: 'channel', id: path.slice('/channels/'.length) } };
-  if (path === '/wallet') return { section: 'wallet', page: 'wallet' };
-  if (path === '/deposit' || path === '/withdraw' || path === '/receive') return { section: 'wallet', page: path.slice(1) as 'deposit' | 'withdraw' | 'receive' };
-  if (path === '/send') return { section: 'transfer' };
-  if (path === '/settings') return { section: 'settings' };
+  if (path === '/wallet') return { section: 'wallet', dialog: null };
+  if (WALLET_DIALOGS.includes(path.slice(1))) return { section: 'wallet', dialog: path.slice(1) as WalletDialog };
+  if (path === '/settings') return { section: 'settings', category: null };
+  if (path.startsWith('/settings/') && SETTINGS_CATEGORIES.includes(path.slice('/settings/'.length))) {
+    return { section: 'settings', category: path.slice('/settings/'.length) as SettingsCategory };
+  }
   return { section: 'channels', view: { kind: 'none' } };
 }
 
@@ -49,24 +48,13 @@ function useHashPath(): string {
 
 function pageOf(route: Route): ReactNode {
   if (route.section === 'channels') return <ChannelsPage view={route.view} />;
-  if (route.section === 'transfer') return <SendPrivately />;
-  if (route.section === 'settings') return <Settings />;
-  switch (route.page) {
-    case 'deposit':
-      return <Deposit />;
-    case 'withdraw':
-      return <Withdraw />;
-    case 'receive':
-      return <Receive />;
-    default:
-      return <MyWallet />;
-  }
+  if (route.section === 'settings') return <Settings category={route.category} />;
+  return <MyWallet dialog={route.dialog} />;
 }
 
 const NAV = [
   { section: 'channels', href: '#/channels', label: 'Channels', icon: <ChannelsIcon /> },
   { section: 'wallet', href: '#/wallet', label: 'My wallet', icon: <WalletIcon /> },
-  { section: 'transfer', href: '#/send', label: 'Private transfer', icon: <SendIcon /> },
   { section: 'settings', href: '#/settings', label: 'Settings', icon: <SettingsIcon /> },
 ] as const;
 
@@ -123,7 +111,7 @@ export function App() {
   const route = routeOf(path);
   return (
     <AppContext.Provider value={context}>
-      <div className={`shell section-${route.section}`}>
+      <div className={`shell section-${route.section}${route.section === 'channels' && route.view.kind === 'channel' ? ' chat-open' : ''}`}>
         <aside className="sidebar">
           <a className="brand" href="#/channels">
             <Logo size={34} />
@@ -142,7 +130,7 @@ export function App() {
           </nav>
           <AccountBar />
         </aside>
-        <main className="content">
+        <main className={route.section === 'channels' ? 'content full' : 'content'}>
           <PhraseBanner />
           {problems.length > 0 ? (
             <ul className="problems" aria-label="Background problems">

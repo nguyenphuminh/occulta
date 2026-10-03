@@ -10,7 +10,7 @@ import { HttpRelayer } from '../../packages/framework/src/modules/relayer/index.
 import { channelNullifierOf } from '../../packages/framework/src/shared/protocol/index.ts';
 import { mineBlock } from '../integration/chain.ts';
 import { newChannelNode, newUser, type ChannelNode } from '../integration/services.ts';
-import { card, createInvite, createWallet, devSend, fundPublicly, openWallet, openAction, openChannel, unlock, useDevNetwork } from './helpers.ts';
+import { createInvite, createWallet, devSend, fundPublicly, openWallet, openAction, openChannel, popup, unlock, useDevNetwork } from './helpers.ts';
 
 const WINDOW = 20n;
 const ETH = 0n;
@@ -77,8 +77,8 @@ test('scenario C: a wallet closed for the whole window reclaims its contribution
   await useDevNetwork(bob);
   await fundPublicly(bob, '1');
   await openAction(bob, 'Deposit');
-  await card(bob, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
-  await card(bob, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
+  await popup(bob, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
+  await popup(bob, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
   await expect(bob.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
 
   const opening = alice.channels.open(decodeInvite(await createInvite(bob)), { token: ETH, amount: parseEther('0.02'), peerAmount: parseEther('0.01'), window: WINDOW, relayer });

@@ -2,7 +2,7 @@ import { useApp } from '../../app/context.ts';
 import { PUBLIC_ADDRESS_TEXT } from '../../shared/addresses.ts';
 import { formatAmount, tokenId } from '../../shared/amounts.ts';
 import { EyeIcon } from '../../shared/icons.tsx';
-import { Card, Copy, ErrorNote, useLoad } from '../../shared/ui.tsx';
+import { Copy, ErrorNote, useLoad } from '../../shared/ui.tsx';
 
 /** The active account's public ETH and USDG on the selected network (BRD 2.2.14.4). */
 function usePublicBalances() {
@@ -18,38 +18,39 @@ function usePublicBalances() {
   );
 }
 
+/** Laid out like the shielded balance, but quieter: it is only there to inform. */
 export function PublicCard() {
   const { occulta } = useApp();
   const { address } = occulta.wallet.activeAccount();
   const balances = usePublicBalances();
   return (
-    <Card
-      title="Public balance"
-      className="public-card"
-      actions={
-        <span className="pill public-tag">
-          <EyeIcon /> Visible on-chain
+    <section className="hero-card public" aria-label="Public balance">
+      <div className="hero-card-top">
+        <span className="eyebrow">
+          <EyeIcon /> Public balance · visible on-chain
         </span>
-      }
-    >
-      <dl className="amounts">
-        <div>
-          <dt>ETH</dt>
-          <dd data-testid="public-eth">{balances.data ? formatAmount('eth', balances.data.eth) : '…'}</dd>
-        </div>
-        <div>
-          <dt>USDG</dt>
-          <dd data-testid="public-usdg">{balances.data ? formatAmount('usdg', balances.data.usdg) : '…'}</dd>
-        </div>
-      </dl>
-      <div className="address-row">
-        <span className="mono" data-testid="public-address">
-          {address}
-        </span>
-        <Copy text={address} label="Copy address" />
       </div>
-      <p className="muted small">{PUBLIC_ADDRESS_TEXT}</p>
+      <div className="big-amounts">
+        <span className="big" data-testid="public-eth">
+          {balances.data ? formatAmount('eth', balances.data.eth) : '…'}
+        </span>
+        <span className="medium" data-testid="public-usdg">
+          {balances.data ? formatAmount('usdg', balances.data.usdg) : '…'}
+        </span>
+      </div>
       <ErrorNote error={balances.error} />
-    </Card>
+      <div className="hero-details">
+        <div className="detail-row">
+          <div className="row-main">
+            <span className="detail-label">Public address</span>
+            <span className="mono truncate" data-testid="public-address">
+              {address}
+            </span>
+          </div>
+          <Copy text={address} label="Copy address" />
+        </div>
+        <p className="hero-note">{PUBLIC_ADDRESS_TEXT}</p>
+      </div>
+    </section>
   );
 }

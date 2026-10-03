@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { mnemonicToAccount, privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, openAction, openChannels, openSettings, openWallet, phraseWords, setPassword, unlock, useDevNetwork } from './helpers.ts';
+import { PASSWORD, card, createWallet, devNetworkInfo, fundPublicly, openAction, openChannels, openSettings, openWallet, phraseWords, popup, setPassword, unlock, useDevNetwork } from './helpers.ts';
 
 /** Everything this website stored in IndexedDB, as text. */
 async function storedText(page: Page): Promise<string> {
@@ -129,6 +129,7 @@ test('the export file restores the wallet in a fresh browser and records when it
   const phrase = await createWallet(page);
   await openSettings(page);
   await page.getByRole('button', { name: 'Add account' }).click();
+  await openSettings(page, 'Backup');
   await expect(page.getByTestId('last-export')).toHaveText('Last export: never');
   const downloading = page.waitForEvent('download');
   await card(page, 'Export').getByRole('button', { name: 'Download export file' }).click();
@@ -157,8 +158,8 @@ test('each account and each network keeps its own notes and channels; Settings k
   await useDevNetwork(page);
   await fundPublicly(page, '1');
   await openAction(page, 'Deposit');
-  await card(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
-  await card(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
+  await popup(page, 'Deposit').getByRole('button', { name: '0.1', exact: true }).click();
+  await popup(page, 'Deposit').getByRole('button', { name: 'Deposit' }).click();
   await expect(page.getByTestId('shielded-eth')).toHaveText('0.1 ETH');
   await expect(page.getByText('1 unspent note', { exact: true })).toBeVisible();
 
@@ -181,7 +182,7 @@ test('each account and each network keeps its own notes and channels; Settings k
 
   // Relayers and relays added in Settings stay, also after locking, and can be removed.
   const relay = devNetworkInfo().libp2pRelays[0] as string;
-  await openSettings(page);
+  await openSettings(page, 'Network');
   const relayers = card(page, 'Transaction relayers on Arbitrum One');
   const relays = card(page, 'libp2p relays on Arbitrum One');
   await relayers.getByLabel('Add', { exact: true }).fill('https://relayer.example.com');
@@ -195,7 +196,7 @@ test('each account and each network keeps its own notes and channels; Settings k
   await expect(relays.getByText(relay)).toBeVisible();
   await openChannels(page);
   await expect(page.getByRole('link', { name: 'Invite', exact: true })).toBeVisible(); // a relay is now known on this network
-  await openSettings(page);
+  await openSettings(page, 'Network');
   await relayers.getByRole('listitem').filter({ hasText: 'https://relayer.example.com' }).getByRole('button', { name: 'Remove' }).click();
   await expect(relayers.getByText('https://relayer.example.com')).toHaveCount(0);
 
@@ -216,9 +217,11 @@ test('the app opens on Channels; the phrase warning is one banner that stays clo
   // Channels first, with the product's line under the logo and what to do before opening one.
   await expect(page.getByRole('heading', { name: 'Channels', level: 1 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Channels' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText(['Channels', 'My wallet', 'Settings']); // private transfers are a wallet dialog
   await expect(page.getByRole('link', { name: /Occulta Private ZK state channels on Arbitrum/ })).toBeVisible();
   await useDevNetwork(page); // a network with a libp2p relay, so the channel list shows
   await expect(page.getByRole('link', { name: 'deposit into your shielded balance' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your channels' })).toBeVisible(); // the pane beside the list, before a channel is chosen
 
   // The banner sits at the top of every page until it is closed, and then stays closed in this browser.
   const banner = page.getByRole('note');
