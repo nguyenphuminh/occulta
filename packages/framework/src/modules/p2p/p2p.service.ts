@@ -30,9 +30,12 @@ const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder().deco
 export class P2PService {
   readonly node: Libp2p;
   private handler: RequestHandler | null = null;
+  private readonly timeoutMs: number;
 
-  constructor(node: Libp2p) {
+  /** `timeoutMs`: how long a request waits for the answer (tests shorten it). */
+  constructor(node: Libp2p, options: { timeoutMs?: number } = {}) {
     this.node = node;
+    this.timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
   }
 
   get peerId(): string {
@@ -68,7 +71,7 @@ export class P2PService {
   }
 
   async request(peer: PeerTarget, message: unknown): Promise<unknown> {
-    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    const signal = AbortSignal.timeout(this.timeoutMs);
     let stream: Stream;
     try {
       stream = await this.node.dialProtocol(peer.addrs.map((a) => multiaddr(a)), CHANNEL_PROTOCOL, { runOnLimitedConnection: true, signal });
@@ -76,8 +79,15 @@ export class P2PService {
       throw new AppError(503, 'PEER_UNREACHABLE', 'The other party is not reachable right now');
     }
     const lp = lpStream(stream);
-    await lp.write(encode(message), { signal });
-    const reply = decode((await lp.read({ signal })).subarray()) as Envelope;
+    let bytes: Awaited<ReturnType<typeof lp.read>>;
+    try {
+      await lp.write(encode(message), { signal });
+      bytes = await lp.read({ signal });
+    } catch {
+      if (signal.aborted) throw new AppError(504, 'PEER_TIMEOUT', 'The other party did not answer in time');
+      throw new AppError(503, 'PEER_UNREACHABLE', 'The other party stopped answering');
+    }
+    const reply = decode(bytes.subarray()) as Envelope;
     await stream.close().catch(() => undefined);
     if (!reply.ok) throw new AppError(409, reply.code, reply.message);
     return reply.result;
@@ -88,7 +98,7 @@ export class P2PService {
   }
 
   private async serve(stream: Stream, connection: Connection): Promise<void> {
-    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    const signal = AbortSignal.timeout(this.timeoutMs);
     const lp = lpStream(stream);
     let reply: Envelope;
     try {

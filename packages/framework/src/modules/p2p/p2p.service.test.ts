@@ -57,6 +57,16 @@ describe('peer-to-peer messaging through a relay', () => {
     expect(await alice.request(target, { type: 'hello', n: 2 })).toMatchObject({ echo: 2 });
   }, 30_000);
 
+  it('reports a peer that does not answer in time in plain words', async () => {
+    const relayAddr = relay.getMultiaddrs()[0]!.toString();
+    const impatient = new P2PService(await createPeerNode({ relays: [relayAddr] }), { timeoutMs: 1_500 });
+    const silent = new P2PService(await createPeerNode({ relays: [relayAddr] }));
+    await silent.listen(() => new Promise(() => undefined)); // never answers
+    await Promise.all([silent.waitForRelay(), impatient.waitForRelay()]);
+    await expect(impatient.request(silent.invite('x'), { type: 'hello' })).rejects.toMatchObject({ code: 'PEER_TIMEOUT', message: 'The other party did not answer in time' });
+    await Promise.all([impatient.stop(), silent.stop()]);
+  }, 30_000);
+
   it('reports an unreachable peer', async () => {
     const gone = { ...bob.invite('x'), addrs: [bob.invite('x').addrs[0]!.replace(bob.peerId, alice.peerId.replace(/.$/, 'X'))] };
     await expect(alice.request(gone, { type: 'hello' })).rejects.toMatchObject({ code: 'PEER_UNREACHABLE' });
