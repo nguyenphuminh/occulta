@@ -5,7 +5,9 @@
 //     and libp2p relay for Arbitrum Sepolia, behind Caddy (automatic HTTPS; WebSockets go to the relay).
 // It deploys the current commit, so the git tree must be clean.
 //
-// Needs ~/.occulta-secrets/cloudflare.token (an API token for occulta.space) and a signed-in gcloud.
+// Needs a signed-in gcloud (gcloud auth login) and Cloudflare: either the browser sign-ins
+// `npx wrangler login` and `~/.local/bin/cloudflared tunnel login` (choose occulta.space), or an API
+// token for occulta.space in ~/.occulta-secrets/cloudflare.token.
 // ~/.occulta-secrets/funder.key, a funded Arbitrum Sepolia key, tops up the relayer's gas when set.
 // The relay's wallet is made on the first run and kept in .occulta/live (git-ignored, mode 600).
 import { execFileSync } from 'node:child_process';
@@ -122,6 +124,22 @@ async function fundRelayer(wallet: RelayWallet): Promise<void> {
 
 // --- Cloudflare ---
 
+interface CloudflareAuth {
+  /** For the DNS API: the token file, or the zone token in cloudflared's login certificate. */
+  apiToken: string;
+  /** For wrangler: the token file, or nothing (wrangler's own browser login). */
+  wranglerEnv: Record<string, string>;
+}
+
+function cloudflareAuth(): CloudflareAuth {
+  const token = secret('cloudflare.token');
+  if (token) return { apiToken: token, wranglerEnv: { CLOUDFLARE_API_TOKEN: token } };
+  const pem = join(homedir(), '.cloudflared/cert.pem');
+  const body = existsSync(pem) ? readFileSync(pem, 'utf8').match(/-----BEGIN ARGO TUNNEL TOKEN-----([\s\S]+?)-----END ARGO TUNNEL TOKEN-----/)?.[1] : undefined;
+  if (!body) throw new Error(`sign in to Cloudflare: npx wrangler login, then ~/.local/bin/cloudflared tunnel login (choose ${DOMAIN}); or put an API token in ${join(SECRETS, 'cloudflare.token')}`);
+  return { apiToken: (JSON.parse(Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8')) as { apiToken: string }).apiToken, wranglerEnv: {} };
+}
+
 async function cloudflare<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...init.headers } });
   const body = (await res.json()) as { success: boolean; result: T; errors: { message: string }[] };
@@ -129,12 +147,12 @@ async function cloudflare<T>(token: string, path: string, init: RequestInit = {}
   return body.result;
 }
 
-async function deployWebsite(token: string): Promise<void> {
+async function deployWebsite(auth: CloudflareAuth): Promise<void> {
   step(`building the website and deploying it to https://${DOMAIN}`);
-  const [zone] = await cloudflare<{ id: string; account: { id: string } }[]>(token, `/zones?name=${DOMAIN}`);
-  if (!zone) throw new Error(`the Cloudflare token cannot see the zone ${DOMAIN}`);
+  const [zone] = await cloudflare<{ id: string; account: { id: string } }[]>(auth.apiToken, `/zones?name=${DOMAIN}`);
+  if (!zone) throw new Error(`the Cloudflare sign-in cannot see the zone ${DOMAIN}`);
   run('npm', ['run', 'build', '-w', 'apps/web'], { quiet: true });
-  run('npx', ['wrangler', 'deploy', '--config', 'apps/web/wrangler.jsonc'], { env: { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: zone.account.id } });
+  run('npx', ['wrangler', 'deploy', '--config', 'apps/web/wrangler.jsonc'], { env: { ...auth.wranglerEnv, CLOUDFLARE_ACCOUNT_ID: zone.account.id } });
 }
 
 /** relay.occulta.space points straight at the VM (not proxied), so Caddy gets its own certificate. */
@@ -265,13 +283,12 @@ async function main(): Promise<void> {
   await fundRelayer(wallet);
   const ip = ensureVm(project);
   await installRelay(project, wallet);
-  const token = secret('cloudflare.token');
-  if (!token) throw new Error(`put a Cloudflare API token for ${DOMAIN} in ${join(SECRETS, 'cloudflare.token')}, then run this again`);
-  await pointRelayName(token, ip);
+  const auth = cloudflareAuth();
+  await pointRelayName(auth.apiToken, ip);
   // Caddy asks for its certificate as soon as the name points here, instead of at its next retry.
   gcloud(project, ['compute', 'ssh', VM.name, `--zone=${VM.zone}`, '--command=sudo systemctl restart caddy']);
   await waitForRelay(wallet);
-  await deployWebsite(token);
+  await deployWebsite(auth);
   console.log(`\nLive: https://${DOMAIN} · relayer ${RELAYER_URL} · relay ${relayAddress(wallet.relayPeerId)}`);
 }
 
