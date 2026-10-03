@@ -11,10 +11,10 @@ import {
   type Occulta,
 } from '@occulta/framework';
 import { formatAmount, parseAmount, tokenId, tokenName, type TokenName } from '../../shared/utils/amounts.ts';
-import type { DepositInput, OpenChannelInput, PayChannelInput, SendPublicInput, TransferInput, WithdrawInput } from './node.schema.ts';
+import type { DepositInput, OpenChannelInput, PayChannelInput, TransferInput, WithdrawInput } from './node.schema.ts';
 
 export interface NodeOptions {
-  /** The relayer role's account (BRD 2.2.15): it never makes deposits or public sends. */
+  /** The relayer role's account (BRD 2.2.15): it never makes deposits. */
   relayerAccountId?: string;
   /** What the node's other roles expose (relayer URL, libp2p relay addresses), for `status`. */
   roles: () => Record<string, unknown>;
@@ -89,14 +89,6 @@ export class NodeService {
       eth: formatAmount('eth', await chain.publicBalance(address, 0n)),
       usdg: formatAmount('usdg', await chain.publicBalance(address, tokenId('usdg', chain.network))),
     };
-  }
-
-  async sendPublic(input: SendPublicInput) {
-    const { chain, wallet } = this.occulta;
-    const account = this.ownAccount();
-    const txHash = await chain.sendPublic(wallet.signer(account.id), tokenId(input.token, chain.network), input.to, parseAmount(input.token, input.amount));
-    await wallet.markUsed(account.id);
-    return { txHash };
   }
 
   // --- shielded pool (BRD 2.2.2–2.2.5) ---
@@ -190,11 +182,11 @@ export class NodeService {
 
   // --- helpers ---
 
-  /** The active account, refusing the relayer account: it never makes deposits or public sends. */
+  /** The active account, refusing the relayer account: it never makes deposits. */
   private ownAccount(): Account {
     const account = this.occulta.wallet.activeAccount();
     if (account.id === this.options.relayerAccountId) {
-      throw new AppError(409, 'RELAYER_ACCOUNT', 'The relayer account never makes deposits or public sends; switch to another account');
+      throw new AppError(409, 'RELAYER_ACCOUNT', 'The relayer account never makes deposits; switch to another account');
     }
     return account;
   }

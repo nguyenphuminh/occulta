@@ -56,7 +56,7 @@ Options:
   --rpc-port <port>             (default 8645)
   --rpc-token-file <path>       Where the access token is written (default ~/.config/occulta/rpc.json)
   --relayer                     Act as a transaction relayer
-  --relayer-account <account>   Account that submits relayed transactions (never one with deposits or public sends)
+  --relayer-account <account>   Account that submits relayed transactions (never one with deposits)
   --relayer-fee-eth <amount>    Quoted fee in ETH
   --relayer-fee-usdg <amount>   Quoted fee in USDG
   --relayer-host <host>         (default 0.0.0.0)

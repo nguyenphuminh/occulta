@@ -94,7 +94,7 @@ async function start(config: Config, occulta: Occulta, logger: Logger): Promise<
     const account = wallet.accounts().find((a) => a.id.toLowerCase() === (config.relayer.account as string).toLowerCase());
     if (!account) throw new AppError(404, 'UNKNOWN_ACCOUNT', `No account ${config.relayer.account} in this wallet`);
     if (account.id === wallet.activeAccount().id) throw new AppError(409, 'RELAYER_ACCOUNT', 'The relayer account cannot be the active account');
-    if (account.used) throw new AppError(409, 'RELAYER_ACCOUNT', 'This account has made deposits or public sends; choose an unused account for relaying');
+    if (account.used) throw new AppError(409, 'RELAYER_ACCOUNT', 'This account has made deposits; choose an unused account for relaying');
     relayerAccountId = account.id;
     relayer = new RelayerService(new ChainAdapter(network), {
       account: wallet.signer(account.id),

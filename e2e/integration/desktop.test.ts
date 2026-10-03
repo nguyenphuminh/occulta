@@ -149,10 +149,10 @@ describe('desktop client on the dev node', () => {
     expect(await webNode.channels.tick(viaDesktop)).toEqual([]);
     expect(web.pool.balances().get(ETH)).toBe(webBefore + parseEther('0.008'));
 
-    // The relayer account earns fee notes and never deposits or sends publicly.
+    // The relayer account earns fee notes and never deposits; no account sends public funds from here.
     await rpc('account.use', { account: relayerAccount });
     await expect(rpc('deposit', { token: 'eth', amount: '0.01' })).rejects.toMatchObject({ code: 'RELAYER_ACCOUNT' });
-    await expect(rpc('public.send', { token: 'eth', to: firstAccount, amount: '0.01' })).rejects.toMatchObject({ code: 'RELAYER_ACCOUNT' });
+    await expect(rpc('public.send', { token: 'eth', to: firstAccount, amount: '0.01' })).rejects.toMatchObject({ code: 'UNKNOWN_COMMAND' });
     const earned = await rpc<{ eth: string }>('balance');
     expect(Number.parseFloat(earned.eth)).toBeGreaterThan(0);
     await rpc('account.use', { account: firstAccount });

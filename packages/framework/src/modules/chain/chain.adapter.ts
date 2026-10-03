@@ -137,13 +137,6 @@ export class ChainAdapter {
     return this.client.readContract({ address: tokenAddress(token), abi: erc20Abi, functionName: 'balanceOf', args: [owner] });
   }
 
-  /** BRD 2.2.14.4: send ETH or USDG publicly. */
-  async sendPublic(account: LocalAccount, token: bigint, to: Address, amount: bigint): Promise<Hex> {
-    const wallet = createWalletClient({ account, chain: this.chain, transport: http(this.network.rpcUrl) });
-    if (token === 0n) return this.confirm(await wallet.sendTransaction({ account, chain: this.chain, to, value: amount }));
-    return this.confirm(await wallet.writeContract({ account, chain: this.chain, address: tokenAddress(token), abi: erc20Abi, functionName: 'transfer', args: [to, amount] }));
-  }
-
   /** BRD 2.2.2: the account deposits; USDG is approved first, ETH is sent with the deposit. */
   async deposit(account: LocalAccount, token: bigint, amount: bigint, inner: bigint, ciphertext: Hex): Promise<Hex> {
     const wallet = createWalletClient({ account, chain: this.chain, transport: http(this.network.rpcUrl) });

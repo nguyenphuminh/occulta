@@ -9,7 +9,6 @@ export const emptySchema = z.object({});
 export const useAccountSchema = z.object({ account: z.string().min(1) });
 export const importAccountSchema = z.object({ privateKey: z.string().min(1) });
 export const useNetworkSchema = z.object({ network: z.string().min(1) });
-export const sendPublicSchema = z.object({ token, to: address, amount });
 export const depositSchema = z.object({ token, amount });
 export const transferSchema = z.object({ to: z.string().min(1), token, amount });
 /** Without `to`, the withdrawal goes to a never-used account of this wallet (BRD 2.2.14.4). */
@@ -27,7 +26,6 @@ export const payChannelSchema = z.object({ channel: z.string().min(1), amount })
 export const channelSchema = z.object({ channel: z.string().min(1) });
 export const exportSchema = z.object({ path: z.string().min(1) });
 
-export type SendPublicInput = z.infer<typeof sendPublicSchema>;
 export type DepositInput = z.infer<typeof depositSchema>;
 export type TransferInput = z.infer<typeof transferSchema>;
 export type WithdrawInput = z.infer<typeof withdrawSchema>;
