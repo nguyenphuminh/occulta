@@ -1507,6 +1507,16 @@ button.icon-button {
   .settings-detail .page-head.only-narrow {
     display: flex;
   }
+
+  /* On its own, the list has no chosen category yet. */
+  .settings:not(.has-detail) .settings-item.on {
+    background: transparent;
+  }
+
+  .settings:not(.has-detail) .settings-item.on .settings-icon {
+    background: var(--surface-2);
+    color: inherit;
+  }
 }
 
 /* ---------- dialogs: a sheet on narrow screens, a panel on wide ones ---------- */
