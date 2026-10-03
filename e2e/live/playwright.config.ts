@@ -15,6 +15,9 @@ export default defineConfig({
   outputDir: '../../test-results/live',
   use: {
     baseURL: process.env.OCCULTA_LIVE_URL ?? 'https://occulta.space',
+    // A click on something covered (e.g. behind a dialog) fails after a minute instead of waiting out the test.
+    actionTimeout: 60_000,
+    navigationTimeout: 60_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     permissions: ['clipboard-read', 'clipboard-write'],

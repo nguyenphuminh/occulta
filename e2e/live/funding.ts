@@ -1,11 +1,12 @@
 // Test money for the live suite on Arbitrum Sepolia: the key in ~/.occulta-secrets/funder.key sends
 // ETH and USDG to the wallets the tests create, and what is left goes back to it afterwards.
-import { readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createPublicClient, createWalletClient, defineChain, erc20Abi, formatEther, http, parseEther, parseUnits, type Address, type Hex } from 'viem';
 import { mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
 import { BUILT_IN_NETWORKS } from '../../packages/framework/src/modules/chain/index.ts';
+import { REPO } from '../../scripts/lib/devnode.ts';
 
 export const network = BUILT_IN_NETWORKS.find((n) => n.id === 'arbitrum-sepolia')!;
 const chain = defineChain({ id: network.chainId, name: network.name, nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [network.rpcUrl] } } });
@@ -31,6 +32,16 @@ export async function fund(to: Address, eth: string, usdgAmount?: string): Promi
       client.waitForTransactionReceipt({ hash: await funderWallet.writeContract({ address: usdg, abi: erc20Abi, functionName: 'transfer', args: [to, parseUnits(usdgAmount, 6)] }) }),
     );
   }
+}
+
+/**
+ * Keeps every test wallet's phrase in .occulta/live/test-wallets.jsonl (git-ignored, mode 600), so
+ * what a failed run leaves in it can still be withdrawn by importing the phrase on the website.
+ */
+export function rememberWallet(name: string, phrase: string): void {
+  const dir = join(REPO, '.occulta/live');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  appendFileSync(join(dir, 'test-wallets.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), name, phrase })}\n`, { mode: 0o600 });
 }
 
 /** Sends a test wallet's public USDG and ETH (first account) back to the funder; dust that cannot pay its gas stays. */

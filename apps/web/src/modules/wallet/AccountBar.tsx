@@ -33,7 +33,7 @@ export function AccountBar() {
           ))}
         </select>
       </Field>
-      <button type="button" className="ghost lock" onClick={() => void lock()}>
+      <button type="button" className="ghost lock" aria-label="Lock" onClick={() => void lock()}>
         <LockIcon />
         <span>Lock</span>
       </button>

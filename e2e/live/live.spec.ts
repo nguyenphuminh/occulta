@@ -18,7 +18,6 @@ import {
   createWallet,
   openAction,
   openChannel,
-  openChannels,
   openDialog,
   openSettings,
   openWallet,
@@ -29,7 +28,7 @@ import {
   setPassword,
   unlock,
 } from '../ui/helpers.ts';
-import { client, fund, funder, network, sweepPublic } from './funding.ts';
+import { client, fund, funder, network, rememberWallet, sweepPublic } from './funding.ts';
 
 const RELAYER = network.relayers[0] as string;
 const RELAY = network.libp2pRelays[0] as string;
@@ -39,6 +38,7 @@ async function newUser(browser: Browser, name: string): Promise<{ context: Brows
   const page = await context.newPage();
   recordConsole(page, name);
   const phrase = await createWallet(page);
+  rememberWallet(name, phrase);
   await expect(page.getByLabel('Network', { exact: true })).toHaveValue(network.id);
   return { context, page, phrase };
 }
@@ -47,9 +47,10 @@ test('the website, its proving files and the relayer answer', async ({ request }
   const home = await request.get('/');
   expect(home.ok()).toBe(true);
   expect(await home.text()).toContain('<div id="root">');
-  const zkey = await request.head('/artifacts/transfer.zkey');
+  // The same proving file the build was made with (Cloudflare does not give its length for a HEAD).
+  const zkey = await request.get('/artifacts/transfer.zkey');
   expect(zkey.ok()).toBe(true);
-  expect(Number(zkey.headers()['content-length'])).toBe(statSync(join(REPO, 'packages/framework/artifacts/transfer.zkey')).size);
+  expect((await zkey.body()).length).toBe(statSync(join(REPO, 'packages/framework/artifacts/transfer.zkey')).size);
   const info = await request.get(`${RELAYER}/relayer/info`);
   expect(info.ok()).toBe(true);
   expect(await info.json()).toMatchObject({ chainId: network.chainId, shieldedAddress: expect.stringMatching(/^occ/) });
@@ -105,15 +106,21 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     // Give the test money back: shielded funds by withdrawal, then public funds by plain transfers.
     for (const page of [alice?.page, bobPage]) {
       if (!page || page.isClosed()) continue;
+      // A channel request left open would cover the page; dialogs with their own address close on navigation.
+      await page
+        .getByRole('dialog', { name: 'Channel request' })
+        .getByRole('button', { name: 'Decline' })
+        .click({ timeout: 2_000 })
+        .catch(() => undefined);
       for (const [token, symbol, fee] of [
         ['eth', 'ETH', 0.0003],
         ['usdg', 'USDG', 0.03],
       ] as const) {
         try {
-          await openWallet(page);
+          await page.goto('/#/wallet');
           const shown = Number(((await page.getByTestId(`shielded-${token}`).textContent()) as string).split(' ')[0]);
           if (shown <= fee) continue;
-          await openAction(page, 'Withdraw');
+          await page.goto('/#/withdraw');
           const withdraw = popup(page, 'Withdraw');
           await withdraw.getByLabel('Token', { exact: true }).selectOption(token);
           await withdraw.getByLabel(`Amount (${symbol})`, { exact: true }).fill(String(Number((shown - fee).toFixed(token === 'eth' ? 6 : 2))));
@@ -244,7 +251,7 @@ test.describe('money and channels on Arbitrum Sepolia', () => {
     const request = bobPage.getByRole('dialog', { name: 'Channel request' });
     const review = a.getByRole('dialog', { name: 'Confirm: Open channel' });
     for (const answer of ['decline', 'ignore', 'accept'] as const) {
-      await openChannels(a);
+      await a.goto('/#/channels'); // a fresh form each time
       await a.goto(link);
       const open = openDialog(a);
       await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.001');
