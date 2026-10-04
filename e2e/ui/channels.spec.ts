@@ -369,3 +369,25 @@ test('a restored export keeps its notes, nicknames and a live channel, which can
   await openWallet(restored);
   await expect(restored.getByTestId('shielded-eth')).toHaveText('0.012 ETH');
 });
+
+test('an opening the shielded balance cannot fund together with the relayer fee is refused before the other side hears of it', async ({ browser }) => {
+  const alice = await userWithShieldedEth(browser, '0.1');
+  const bob = await (await browser.newContext()).newPage();
+  recordConsole(bob, 'bob');
+  await createWallet(bob);
+  await useDevNetwork(bob);
+
+  await alice.goto(await invite(bob));
+  const open = openDialog(alice);
+  await open.getByLabel('You fund (ETH)', { exact: true }).fill('0.1'); // all she has; funding also pays the relayer
+  await open.getByRole('button', { name: 'Open channel' }).click();
+  const review = alice.getByRole('dialog', { name: 'Confirm: Open channel' });
+  await review.getByRole('button', { name: 'Confirm' }).click();
+  await expect(review.getByRole('alert')).toHaveText('Your shielded balance has 0.1 ETH. Funding 0.1 ETH also pays the relayer 0.0001 ETH.');
+  await review.getByRole('button', { name: 'Cancel' }).click();
+  await expect(open).toBeVisible(); // still open, to lower the amount
+  await open.getByRole('button', { name: 'Close' }).click();
+  await expect(alice.getByText('No channels yet.')).toBeVisible(); // no request was started
+  await openChannels(bob);
+  await expect(bob.getByText('No channels yet.')).toBeVisible();
+});

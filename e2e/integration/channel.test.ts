@@ -77,9 +77,9 @@ describe('channels on the dev node', () => {
     await alice.pool.deposit(ETH, parseEther('1'));
     await bob.pool.deposit(ETH, parseEther('0.5'));
     await carol.pool.deposit(ETH, parseEther('0.2'));
-    a = await newChannelNode(alice, chain, relayAddr);
-    b = await newChannelNode(bob, chain, relayAddr, { approveOpen: async () => true, onJoined: (channelId) => joined.push({ channelId, status: b.channels.get(channelId).status }) });
-    c = await newChannelNode(carol, chain, relayAddr);
+    a = await newChannelNode(alice, chain, relayAddr, relayer.port);
+    b = await newChannelNode(bob, chain, relayAddr, relayer.port, { approveOpen: async () => true, onJoined: (channelId) => joined.push({ channelId, status: b.channels.get(channelId).status }) });
+    c = await newChannelNode(carol, chain, relayAddr, relayer.port);
   });
 
   afterAll(async () => {
@@ -178,6 +178,17 @@ describe('channels on the dev node', () => {
   it('refuses to open with an out-of-range window, or when the invitee would fund without approving', async () => {
     expect(await code(a.channels.open(await invite(bob, b), { token: ETH, amount: parseEther('0.01'), window: 8n * 86_400n, relayer: relayer.port }))).toBe('INVALID_WINDOW');
     expect(await code(a.channels.open(await invite(carol, c), { token: ETH, amount: parseEther('0.01'), peerAmount: 1n, relayer: relayer.port }))).toBe('OPEN_DECLINED');
+  });
+
+  it('opens or joins only a channel this side can fund together with the relayer fee of its funding (BRD 2.2.7)', async () => {
+    await Promise.all([bob.pool.sync(), carol.pool.sync()]);
+    // Carol offers all she has: the funding would also owe the relayer, so the open stops before Bob hears of it.
+    const bobChannels = b.channels.list().length;
+    expect(await code(c.channels.open(await invite(bob, b), { token: ETH, amount: shielded(carol), relayer: relayer.port }))).toBe('INSUFFICIENT_FUNDS');
+    expect(b.channels.list()).toHaveLength(bobChannels);
+    // Alice asks Bob, who approves everything, to fund all he has: he refuses for the same reason.
+    expect(await code(a.channels.open(await invite(bob, b), { token: ETH, amount: parseEther('0.01'), peerAmount: shielded(bob), relayer: relayer.port }))).toBe('INSUFFICIENT_FUNDS');
+    expect(b.channels.list()).toHaveLength(bobChannels);
   });
 
   describe('disputes (BRD 2.2.10)', () => {

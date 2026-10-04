@@ -87,6 +87,8 @@ export interface ChannelDeps {
   prover: ProverPort;
   p2p: P2PService;
   repository: ChannelRepository;
+  /** The relayer this side funds through: its fee counts when checking that this side can fund (BRD 2.2.7). */
+  relayer: () => RelayerPort;
   /**
    * Decides on channels peers propose. Without it, channels this side does not fund are accepted
    * (it shared its invite for that) and channels that need its money are refused.
@@ -173,8 +175,11 @@ export class ChannelService {
     if (o.amount <= closingFee || o.amount > MAX_AMOUNT || peerAmount < 0n || peerAmount > MAX_AMOUNT) {
       throw new AppError(400, 'INVALID_AMOUNT', 'The contribution must be larger than the closing fee and fit in a note');
     }
+    // Funding is a transfer of its own, so it also pays the relayer its fee (the same quote as the closing fee).
     await pool.sync(account);
-    if ((pool.balances(account).get(o.token) ?? 0n) < o.amount) throw new AppError(409, 'INSUFFICIENT_FUNDS', 'Not enough shielded funds to fund this channel');
+    if ((pool.balances(account).get(o.token) ?? 0n) < o.amount + closingFee) {
+      throw new AppError(409, 'INSUFFICIENT_FUNDS', 'Not enough shielded funds to fund this channel and pay the relayer fee');
+    }
 
     const poolKeys = await keys.poolKeys(account);
     const { index, secrets } = await keys.newChannel(account, this.deps.chain.network.id);
@@ -510,8 +515,9 @@ export class ChannelService {
     const approved = approveOpen ? await approveOpen(request) : m.amountB === 0n;
     if (!approved) throw new AppError(403, 'OPEN_DECLINED', 'The other party declined this channel');
     if (m.amountB > 0n) {
+      const fee = quotedFee(await this.deps.relayer().info(), m.token);
       await pool.sync(account);
-      if ((pool.balances(account).get(m.token) ?? 0n) < m.amountB) throw new AppError(409, 'INSUFFICIENT_FUNDS', 'The other party cannot fund its side');
+      if ((pool.balances(account).get(m.token) ?? 0n) < m.amountB + fee) throw new AppError(409, 'INSUFFICIENT_FUNDS', 'The other party cannot fund its side and pay the relayer fee');
     }
 
     const poolKeys = await keys.poolKeys(account);
