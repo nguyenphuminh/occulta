@@ -9,19 +9,28 @@ Users deposit ETH or USDG into a shielded pool, then open payment channels funde
 | | |
 |---|---|
 | HackQuest | [link to be added] |
-| Demo video | [link to be added] |
+| Demo video | <https://youtu.be/OA2P_uJtZQY> |
+| Pitch video | <https://youtu.be/Sz2T508lfog> |
 | Website | <https://occulta.space> |
-| GitHub | [repository link to be added] |
+| GitHub | <https://github.com/nguyenphuminh/occulta> |
 | Relayer and libp2p relay | <https://relay.occulta.space> |
 
 Contracts on Arbitrum Sepolia (production build, 3–7 day dispute window):
 
-| Contract | Address |
-|---|---|
-| Pool | [`0x5CfB7B562baa70135590162609B480d5773aDF5a`](https://sepolia.arbiscan.io/address/0x5CfB7B562baa70135590162609B480d5773aDF5a) |
-| Disputes | [`0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83`](https://sepolia.arbiscan.io/address/0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83) |
-| Groth16 verifier | [`0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770`](https://sepolia.arbiscan.io/address/0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770) |
-| Poseidon hasher | [`0x154052BAD5D2D3c79d31FDF731E46586144646F2`](https://sepolia.arbiscan.io/address/0x154052BAD5D2D3c79d31FDF731E46586144646F2) |
+| Contract | Address | Source |
+|---|---|---|
+| Pool | [`0x5CfB7B562baa70135590162609B480d5773aDF5a`](https://sepolia.arbiscan.io/address/0x5CfB7B562baa70135590162609B480d5773aDF5a) | [`contracts/pool`](contracts/pool) |
+| Disputes | [`0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83`](https://sepolia.arbiscan.io/address/0x9e4E216DF78Cb42ef7Cbe4Af779E4C114e9Eeb83) | [`contracts/disputes`](contracts/disputes) |
+| Groth16 verifier | [`0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770`](https://sepolia.arbiscan.io/address/0x8A7f9CC5635cf809e4c44AD3f0021237F84D6770) | [`contracts/verifier`](contracts/verifier) |
+| Poseidon hasher | [`0x154052BAD5D2D3c79d31FDF731E46586144646F2`](https://sepolia.arbiscan.io/address/0x154052BAD5D2D3c79d31FDF731E46586144646F2) | [`contracts/hasher`](contracts/hasher) |
+
+All four build on the shared code in [`contracts/core`](contracts/core): field arithmetic, Poseidon, the Merkle tree and Groth16 verification.
+
+> [!NOTE]
+> **The contracts are not verified on Arbiscan or Blockscout, but anyone can check them.**
+> - **Why the explorers can't:** we deployed the contracts with our own build script instead of cargo-stylus, the official Stylus tool, which the explorers use to verify. They rebuild the source with cargo-stylus and compare the result byte for byte with the code on chain. Both tools produce the same Wasm, but they compress it with different brotli versions, so the compressed code differs for the verifier, pool and disputes contracts. The Poseidon hasher happens to compress the same way, so it can be verified.
+> - **Why we can't redeploy:** we tried to redeploy with cargo-stylus. But on 2 October 2026, about two hours after our deployment, Arbitrum paused the activation of new Stylus contracts, and new activations fail on Arbitrum Sepolia too.
+> - **How to check them:** `npm run verify:contracts` rebuilds all four contracts from this source and checks that each one matches the code on chain, byte for byte ([details](#verify-the-deployed-contracts)).
 
 # 3. Tech stack
 
