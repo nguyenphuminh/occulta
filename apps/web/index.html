@@ -6,6 +6,17 @@
     <title>Occulta State Channel</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      // The theme before the first paint, as src/app/theme.ts keeps it (BRD 2.2.14.10).
+      (function () {
+        var choice = null;
+        try {
+          choice = localStorage.getItem('occulta.theme');
+        } catch (e) {}
+        var dark = choice === 'dark' || (choice !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -2,12 +2,13 @@ import { useState, type ReactNode } from 'react';
 import { chainIdAt, defaultRpcUrls } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import { readSettings, startNode, writeSettings, type WebSettings } from '../../app/settings.ts';
-import { BackIcon, ChannelsIcon, KeyIcon, ShieldIcon } from '../../shared/icons.tsx';
+import { chooseTheme, themeChoice, type ThemeChoice } from '../../app/theme.ts';
+import { BackIcon, ChannelsIcon, KeyIcon, ShieldIcon, ThemeIcon } from '../../shared/icons.tsx';
 import { Button, Card, ErrorNote, Field, Notice, useAction } from '../../shared/ui.tsx';
 import { RestoreWallet } from '../onboarding/index.ts';
 import { Accounts } from '../wallet/index.ts';
 
-export type SettingsCategory = 'accounts' | 'backup' | 'network';
+export type SettingsCategory = 'accounts' | 'backup' | 'network' | 'appearance';
 
 function EditableList({ title, fixed, own, placeholder, onChange }: { title: string; fixed: string[]; own: string[]; placeholder: string; onChange: (next: string[]) => Promise<void> }) {
   const [entry, setEntry] = useState('');
@@ -188,14 +189,47 @@ function Network() {
   );
 }
 
+const THEMES: { id: ThemeChoice; label: string }[] = [
+  { id: 'system', label: 'Same as this device' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+];
+
+/** BRD 2.2.14.10: the theme, for this browser. */
+function Appearance() {
+  const [choice, setChoice] = useState(themeChoice);
+  return (
+    <Card title="Theme">
+      <div className="stack" role="radiogroup" aria-label="Theme">
+        {THEMES.map((t) => (
+          <label key={t.id} className="check">
+            <input
+              type="radio"
+              name="theme"
+              checked={choice === t.id}
+              onChange={() => {
+                chooseTheme(t.id);
+                setChoice(t.id);
+              }}
+            />{' '}
+            {t.label}
+          </label>
+        ))}
+      </div>
+      <p className="muted small">Kept in this browser for every account, and stored unencrypted, since it says nothing about your wallet.</p>
+    </Card>
+  );
+}
+
 const CATEGORIES: { id: SettingsCategory; title: string; text: (network: string) => string; icon: ReactNode }[] = [
   { id: 'accounts', title: 'Accounts', text: () => 'Switch, add or import accounts', icon: <KeyIcon /> },
   { id: 'backup', title: 'Backup', text: () => 'Export everything, or restore a file', icon: <ShieldIcon /> },
   { id: 'network', title: 'Network', text: (network) => `RPC endpoints, relayers and relays on ${network}`, icon: <ChannelsIcon /> },
+  { id: 'appearance', title: 'Appearance', text: () => 'Light, dark or the same as this device', icon: <ThemeIcon /> },
 ];
 
 /**
- * Settings as categories beside the chosen one (accounts, backup, network); on phones the list
+ * Settings as categories beside the chosen one (accounts, backup, network, appearance); on phones the list
  * comes first and a category opens on its own. Without a category in the address, wide screens show Accounts.
  */
 export function Settings({ category }: { category: SettingsCategory | null }) {
@@ -228,7 +262,7 @@ export function Settings({ category }: { category: SettingsCategory | null }) {
           </a>
           <h2>{current.title}</h2>
         </header>
-        {shown === 'accounts' ? <Accounts /> : shown === 'backup' ? <Backup /> : <Network />}
+        {shown === 'accounts' ? <Accounts /> : shown === 'backup' ? <Backup /> : shown === 'network' ? <Network /> : <Appearance />}
       </div>
     </div>
   );

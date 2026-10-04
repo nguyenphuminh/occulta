@@ -1,5 +1,5 @@
-// BRD 2.2.14.1–2.2.14.6 in the browser: create, import, accounts, password and lock, networks,
-// the user's own RPC endpoints, reset, export and restore.
+// BRD 2.2.14.1–2.2.14.6 and 2.2.14.10 in the browser: create, import, accounts, password and lock,
+// networks, the user's own RPC endpoints, reset, export and restore, the theme.
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -331,4 +331,29 @@ test('own RPC endpoints are checked before they are kept, tried first, and with 
   await expect(fallback).toHaveCount(0); // only shown while the user has endpoints of their own
   own.close();
   otherChain.close();
+});
+
+test('the theme follows the device until one is chosen in Settings, and the choice holds from the lock screen on', async ({ page }) => {
+  const background = (rgb: string) => expect(page.locator('body')).toHaveCSS('background-color', rgb);
+  const dark = 'rgb(0, 0, 0)';
+  const light = 'rgb(255, 255, 255)';
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await createWallet(page);
+  await background(dark);
+
+  await openSettings(page, 'Appearance');
+  await expect(page.getByLabel('Same as this device', { exact: true })).toBeChecked();
+  await page.getByLabel('Light', { exact: true }).check();
+  await background(light);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+  await background(light); // the lock screen already has it, on a dark device
+
+  await unlock(page);
+  await openSettings(page, 'Appearance');
+  await expect(page.getByLabel('Light', { exact: true })).toBeChecked();
+  await page.getByLabel('Same as this device', { exact: true }).check();
+  await background(dark);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await background(light); // and follows the device at once
 });

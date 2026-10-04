@@ -134,6 +134,13 @@ export const CloseIcon = () => (
   </Icon>
 );
 
+export const ThemeIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" />
+  </Icon>
+);
+
 /** The Occulta mark: a disc passing in front of another, an occultation. */
 export function Logo({ size = 32 }: { size?: number }) {
   return (

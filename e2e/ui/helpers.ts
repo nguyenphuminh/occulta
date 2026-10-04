@@ -46,7 +46,7 @@ export async function openAction(page: Page, name: 'Deposit' | 'Withdraw' | 'Rec
 export const popup = (page: Page, title: string): Locator => page.getByRole('dialog', { name: title, exact: true });
 
 /** Opens Settings, and one of its categories (Accounts shows when none is chosen). */
-export async function openSettings(page: Page, category?: 'Accounts' | 'Backup' | 'Network'): Promise<void> {
+export async function openSettings(page: Page, category?: 'Accounts' | 'Backup' | 'Network' | 'Appearance'): Promise<void> {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings' }).click();
   if (category) await page.getByRole('navigation', { name: 'Settings categories' }).getByRole('link', { name: new RegExp(`^${category}`) }).click();
 }

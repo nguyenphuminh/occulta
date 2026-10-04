@@ -19,7 +19,7 @@ const TICK_MS = Number(import.meta.env.VITE_OCCULTA_TICK_MS ?? 10_000);
 type Route = { section: 'channels'; view: ChannelsView } | { section: 'wallet'; dialog: WalletDialog | null } | { section: 'settings'; category: SettingsCategory | null };
 
 const WALLET_DIALOGS: readonly string[] = ['deposit', 'withdraw', 'receive', 'send'] satisfies WalletDialog[];
-const SETTINGS_CATEGORIES: readonly string[] = ['accounts', 'backup', 'network'] satisfies SettingsCategory[];
+const SETTINGS_CATEGORIES: readonly string[] = ['accounts', 'backup', 'network', 'appearance'] satisfies SettingsCategory[];
 
 /** Channels are the product, so they are also where the app opens. */
 function routeOf(path: string): Route {

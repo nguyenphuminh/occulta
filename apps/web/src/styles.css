@@ -1,4 +1,4 @@
-/* Occulta wallet — monochrome surfaces, soft indigo glows, generous radii; light or dark with the system. */
+/* Occulta wallet — monochrome surfaces, soft indigo glows, generous radii; light or dark like the device, or as chosen. */
 
 :root {
   --bg: #ffffff;
@@ -42,34 +42,33 @@
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --bg-soft: #09090b;
-    --surface: #111114;
-    --surface-2: #1c1c21;
-    --surface-3: #27272d;
-    --text: #f5f5f7;
-    --muted: #a1a1aa;
-    --line: #232329;
-    --primary: #f5f5f7;
-    --primary-text: #0b0b0d;
-    --primary-hover: #d9d9de;
-    --accent: #818cf8;
-    --accent-soft: #1d1f3a;
-    --glow-1: rgb(79 70 229 / 22%);
-    --glow-2: rgb(147 51 234 / 18%);
-    --danger: #f87171;
-    --danger-soft: #2a1213;
-    --warn-soft: #2a2110;
-    --ok: #34d399;
-    --ok-soft: #0f2a21;
-    --info-soft: #15172b;
-    --hero-from: #1c1c24;
-    --hero-to: #2b2b3a;
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
-    color-scheme: dark;
-  }
+/* Set on the page before its first paint, from the device or the choice in Settings (BRD 2.2.14.10). */
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --bg-soft: #09090b;
+  --surface: #111114;
+  --surface-2: #1c1c21;
+  --surface-3: #27272d;
+  --text: #f5f5f7;
+  --muted: #a1a1aa;
+  --line: #232329;
+  --primary: #f5f5f7;
+  --primary-text: #0b0b0d;
+  --primary-hover: #d9d9de;
+  --accent: #818cf8;
+  --accent-soft: #1d1f3a;
+  --glow-1: rgb(79 70 229 / 22%);
+  --glow-2: rgb(147 51 234 / 18%);
+  --danger: #f87171;
+  --danger-soft: #2a1213;
+  --warn-soft: #2a2110;
+  --ok: #34d399;
+  --ok-soft: #0f2a21;
+  --info-soft: #15172b;
+  --hero-from: #1c1c24;
+  --hero-to: #2b2b3a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+  color-scheme: dark;
 }
 
 * {
