@@ -123,6 +123,7 @@ export class Occulta {
         prover,
         p2p,
         repository: channelStore,
+        relayer: () => this.relayer(),
         approveOpen: options.approveOpen,
         onJoined: options.onJoined,
         confirmPayment: options.confirmPayment,

@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   relayer = new HttpRelayer(network.relayers[0] as string);
   aliceUser = await devSend(() => newUser(network, chain, '1'));
   await aliceUser.pool.deposit(ETH, parseEther('0.1'));
-  alice = await newChannelNode(aliceUser, chain, network.libp2pRelays[0] as string);
+  alice = await newChannelNode(aliceUser, chain, network.libp2pRelays[0] as string, relayer);
 });
 
 test.afterAll(async () => {

@@ -138,7 +138,7 @@ describe('desktop client on the dev node', () => {
     expect(await rpc('balance')).toMatchObject({ eth: '0.21 ETH' });
 
     // A channel with the website-style user, who reaches the desktop through its libp2p relay.
-    const webNode = await newChannelNode(web, chain, relayAddr);
+    const webNode = await newChannelNode(web, chain, relayAddr, viaDesktop);
     nodes.push(webNode);
     const invite = encodeInvite(webNode.p2p.invite(shieldedAddressOf(await web.keys.poolKeys())));
     const opened = await rpc<{ id: string; status: string }>('channel.open', { invite, token: 'eth', amount: '0.05' });

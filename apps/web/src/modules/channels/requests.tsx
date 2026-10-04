@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { OpenRequest } from '@occulta/framework';
+import { quotedFee, type OpenRequest } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
 import type { Asked, Prompt } from '../../app/prompts.ts';
 import { formatAmount, tokenName } from '../../shared/amounts.ts';
 import { Avatar, BackIcon } from '../../shared/icons.tsx';
-import { Button, ErrorNote, Field, Notice, useAction } from '../../shared/ui.tsx';
+import { Button, ErrorNote, Field, Notice, useAction, useLoad } from '../../shared/ui.tsx';
 import { MAX_NICKNAME, setNickname } from './nicknames.ts';
 import { peerName } from './status.ts';
 
@@ -34,7 +34,9 @@ export function RequestAnswer({ asked }: { asked: ChannelRequest }) {
   const token = tokenName(request.token);
   const [nickname, setNicknameText] = useState('');
   const shielded = occulta.pool.balances().get(request.token) ?? 0n;
-  const short = shielded < request.peerAmount;
+  // Funding is a transfer of its own: the relayer's fee comes on top of what they ask for.
+  const fee = useLoad(async () => quotedFee(await occulta.relayer().info(), request.token), request.channelId);
+  const short = fee.data !== null && shielded < request.peerAmount + fee.data;
   const accept = useAction(async () => {
     if (nickname.trim()) await setNickname(occulta, request.peerId, nickname);
     prompts.answer(asked.id, true);
@@ -44,10 +46,15 @@ export function RequestAnswer({ asked }: { asked: ChannelRequest }) {
       <Field label="Nickname for them (optional)" hint="Only you see it. You can change it later.">
         <input value={nickname} maxLength={MAX_NICKNAME} placeholder="e.g. Bob" onChange={(e) => setNicknameText(e.target.value)} />
       </Field>
-      {short ? <Notice tone="warn">Your shielded balance has {formatAmount(token, shielded)}, less than they ask you to fund.</Notice> : null}
-      <ErrorNote error={accept.error} />
+      {short ? (
+        <Notice tone="warn">
+          Your shielded balance has {formatAmount(token, shielded)}, less than the {formatAmount(token, request.peerAmount)} they ask you to fund plus the relayer fee of{' '}
+          {formatAmount(token, fee.data as bigint)}.
+        </Notice>
+      ) : null}
+      <ErrorNote error={fee.error ?? accept.error} />
       <div className="stack">
-        <Button className="primary wide" busy={accept.busy} disabled={short} onClick={() => void accept.perform()}>
+        <Button className="primary wide" busy={accept.busy} disabled={short || fee.data === null} onClick={() => void accept.perform()}>
           Accept and fund
         </Button>
         <Button className="ghost wide" onClick={() => prompts.answer(asked.id, false)}>

@@ -10,7 +10,7 @@ import { DisputeService } from '../../packages/framework/src/modules/dispute/ind
 import { KeyRing } from '../../packages/framework/src/modules/keys/index.ts';
 import { P2PService } from '../../packages/framework/src/modules/p2p/index.ts';
 import { PoolRepository, PoolService } from '../../packages/framework/src/modules/pool/index.ts';
-import { DirectRelayer, RelayerService } from '../../packages/framework/src/modules/relayer/index.ts';
+import { DirectRelayer, RelayerService, type RelayerPort } from '../../packages/framework/src/modules/relayer/index.ts';
 import { MemoryStore } from '../../packages/framework/src/modules/storage/index.ts';
 import { WalletRepository, WalletService } from '../../packages/framework/src/modules/wallet/index.ts';
 import { Prover, fileArtifacts } from '../../packages/framework/src/shared/integrations/prover.ts';
@@ -75,16 +75,17 @@ export interface ChannelNode {
   disputes: DisputeService;
 }
 
-/** A user's channel node: reachable through the libp2p relay, answering channel messages. */
+/** A user's channel node: reachable through the libp2p relay, answering channel messages, funding through `relayer`. */
 export async function newChannelNode(
   user: User,
   chain: ChainAdapter,
   relayAddr: string,
+  relayer: RelayerPort,
   options: Pick<ChannelDeps, 'approveOpen' | 'onJoined' | 'confirmPayment'> = {},
 ): Promise<ChannelNode> {
   const p2p = new P2PService(await createPeerNode({ relays: [relayAddr] }));
   const { wallet, keys, pool } = user;
-  const channels = new ChannelService({ wallet, keys, chain, pool, prover, p2p, repository: new ChannelRepository(wallet), ...options });
+  const channels = new ChannelService({ wallet, keys, chain, pool, prover, p2p, repository: new ChannelRepository(wallet), relayer: () => relayer, ...options });
   await channels.listen();
   await p2p.waitForRelay();
   return { p2p, channels, disputes: new DisputeService({ wallet, keys, chain, pool, prover, channels }) };

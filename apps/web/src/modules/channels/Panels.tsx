@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { decodeInvite, inviteLink, shieldedAddressOf } from '@occulta/framework';
+import { decodeInvite, inviteLink, quotedFee, shieldedAddressOf } from '@occulta/framework';
 import { useApp } from '../../app/context.ts';
-import { parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
+import { formatAmount, parseAmount, tokenId, type TokenName } from '../../shared/amounts.ts';
 import { AmountField, Button, Copy, ErrorNote, Field, Modal, Notice, Qr, RelayedSubmit, closeTo, useAction } from '../../shared/ui.tsx';
 import { TokenSelect } from '../public/index.ts';
 import { MAX_NICKNAME, setNickname } from './nicknames.ts';
@@ -101,6 +101,13 @@ export function OpenDialog({ initialInvite }: { initialInvite: string }) {
         run={async (relayer) => {
           const target = decodeInvite(invite);
           const terms = { token: tokenId(token, network), amount: parseAmount(token, amount) as bigint, peerAmount: ask ?? 0n };
+          // Checked here too, so a channel this wallet cannot fund is refused before the other side hears of it.
+          const fee = quotedFee(await relayer.info(), terms.token);
+          await occulta.pool.sync();
+          const shielded = occulta.pool.balances().get(terms.token) ?? 0n;
+          if (shielded < terms.amount + fee) {
+            throw new Error(`Your shielded balance has ${formatAmount(token, shielded)}. Funding ${formatAmount(token, terms.amount)} also pays the relayer ${formatAmount(token, fee)}.`);
+          }
           if (nickname.trim()) await setNickname(occulta, target.peerId, nickname);
           const { channels, wallet } = occulta;
           opened.current = pendingOpens.start(
