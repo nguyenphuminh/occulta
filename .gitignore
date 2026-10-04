@@ -12,6 +12,12 @@ GEMINI.md
 .windsurfrules
 .github/copilot-instructions.md
 
+# --- design references: kept local, never committed ---
+/reference/
+
+# --- pitch material: kept local, never committed ---
+/pitchdeck/
+
 # --- dependencies ---
 node_modules/
 
@@ -24,7 +30,7 @@ target/
 
 # --- generated circuit and contract artifacts (recreated by `npm run setup`) ---
 circuits/build/
-contracts/pool/src/generated/
+contracts/core/src/generated/
 packages/framework/artifacts/
 apps/web/public/artifacts/
 

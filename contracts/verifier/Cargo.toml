@@ -1,0 +1,25 @@
+[package]
+name = "occulta-verifier"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+stylus-sdk = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+occulta-core = { workspace = true }
+
+[dev-dependencies]
+stylus-sdk = { workspace = true, features = ["stylus-test"] }
+serde_json = "1"
+
+[features]
+default = ["mini-alloc"]
+export-abi = ["stylus-sdk/export-abi"]
+mini-alloc = ["stylus-sdk/mini-alloc"]
+# Expected by the stylus-sdk macros.
+contract-client-gen = []
+
+[lib]
+crate-type = ["lib", "cdylib"]
