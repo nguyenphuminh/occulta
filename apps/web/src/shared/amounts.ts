@@ -20,4 +20,11 @@ export function parseAmount(name: TokenName, text: string): bigint | null {
 }
 
 export const formatAmount = (name: TokenName, value: bigint): string => `${formatUnits(value, DECIMALS[name])} ${SYMBOL[name]}`;
+
+/** A balance cut, never rounded up, to at most 6 decimals; a non-zero balance below that shows as "< 0.000001". */
+export function formatBalance(name: TokenName, value: bigint): string {
+  const step = 10n ** BigInt(Math.max(DECIMALS[name] - 6, 0));
+  const shown = (value / step) * step;
+  return shown === 0n && value > 0n ? `< ${formatAmount(name, step)}` : formatAmount(name, shown);
+}
 export const toDecimal = (name: TokenName, value: bigint): string => formatUnits(value, DECIMALS[name]);

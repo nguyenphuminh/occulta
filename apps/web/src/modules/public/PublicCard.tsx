@@ -1,6 +1,6 @@
 import { useApp } from '../../app/context.ts';
 import { PUBLIC_ADDRESS_TEXT, shortAddress } from '../../shared/addresses.ts';
-import { formatAmount, tokenId } from '../../shared/amounts.ts';
+import { formatAmount, formatBalance, tokenId } from '../../shared/amounts.ts';
 import { EyeIcon } from '../../shared/icons.tsx';
 import { Copy, ErrorNote, useLoad } from '../../shared/ui.tsx';
 
@@ -31,11 +31,11 @@ export function PublicCard() {
         </span>
       </div>
       <div className="big-amounts">
-        <span className="big" data-testid="public-eth">
-          {balances.data ? formatAmount('eth', balances.data.eth) : '…'}
+        <span className="big" data-testid="public-eth" title={balances.data ? formatAmount('eth', balances.data.eth) : undefined}>
+          {balances.data ? formatBalance('eth', balances.data.eth) : '…'}
         </span>
-        <span className="medium" data-testid="public-usdg">
-          {balances.data ? formatAmount('usdg', balances.data.usdg) : '…'}
+        <span className="medium" data-testid="public-usdg" title={balances.data ? formatAmount('usdg', balances.data.usdg) : undefined}>
+          {balances.data ? formatBalance('usdg', balances.data.usdg) : '…'}
         </span>
       </div>
       <ErrorNote error={balances.error} />

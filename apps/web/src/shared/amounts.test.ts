@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILT_IN_NETWORKS } from '@occulta/framework';
-import { formatAmount, parseAmount, tokenId, tokenName } from './amounts.ts';
+import { formatAmount, formatBalance, parseAmount, tokenId, tokenName } from './amounts.ts';
 
 describe('amounts typed by the user', () => {
   it('reads decimal amounts in token units and refuses everything else', () => {
@@ -14,5 +14,13 @@ describe('amounts typed by the user', () => {
     expect(formatAmount('eth', 1500000000000000000n)).toBe('1.5 ETH');
     expect(tokenId('usdg', sepolia)).toBe(BigInt(sepolia.usdg));
     expect(tokenName(0n)).toBe('eth');
+  });
+
+  it('cuts balances to 6 decimals without rounding up', () => {
+    expect(formatBalance('eth', 15614519814900763n)).toBe('0.015614 ETH');
+    expect(formatBalance('eth', 16000000000000000n)).toBe('0.016 ETH');
+    expect(formatBalance('eth', 999999999999n)).toBe('< 0.000001 ETH');
+    expect(formatBalance('eth', 0n)).toBe('0 ETH');
+    expect(formatBalance('usdg', 88_770_001n)).toBe('88.770001 USDG');
   });
 });
