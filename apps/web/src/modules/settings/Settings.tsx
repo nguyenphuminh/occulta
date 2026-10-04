@@ -221,11 +221,11 @@ function Appearance() {
   );
 }
 
-const CATEGORIES: { id: SettingsCategory; title: string; text: (network: string) => string; icon: ReactNode }[] = [
-  { id: 'accounts', title: 'Accounts', text: () => 'Switch, add or import accounts', icon: <KeyIcon /> },
-  { id: 'backup', title: 'Backup', text: () => 'Export everything, or restore a file', icon: <ShieldIcon /> },
-  { id: 'network', title: 'Network', text: (network) => `RPC endpoints, relayers and relays on ${network}`, icon: <ChannelsIcon /> },
-  { id: 'appearance', title: 'Appearance', text: () => 'Light, dark or the same as this device', icon: <ThemeIcon /> },
+const CATEGORIES: { id: SettingsCategory; title: string; text: string; icon: ReactNode }[] = [
+  { id: 'accounts', title: 'Accounts', text: 'Switch, add or import accounts', icon: <KeyIcon /> },
+  { id: 'backup', title: 'Backup', text: 'Export everything, or restore a file', icon: <ShieldIcon /> },
+  { id: 'network', title: 'Network', text: 'RPC endpoints, relayers and relays', icon: <ChannelsIcon /> },
+  { id: 'appearance', title: 'Appearance', text: 'Light, dark or like this device', icon: <ThemeIcon /> },
 ];
 
 /**
@@ -233,8 +233,7 @@ const CATEGORIES: { id: SettingsCategory; title: string; text: (network: string)
  * comes first and a category opens on its own. Without a category in the address, wide screens show Accounts.
  */
 export function Settings({ category }: { category: SettingsCategory | null }) {
-  const { occulta, version } = useApp();
-  const network = occulta.network();
+  const { version } = useApp();
   const shown = category ?? 'accounts';
   const current = CATEGORIES.find((c) => c.id === shown) as (typeof CATEGORIES)[number];
   return (
@@ -248,7 +247,7 @@ export function Settings({ category }: { category: SettingsCategory | null }) {
                 <span className="settings-icon">{c.icon}</span>
                 <span className="settings-item-text">
                   <strong>{c.title}</strong>
-                  <span className="muted small">{c.text(network.name)}</span>
+                  <span className="muted small">{c.text}</span>
                 </span>
               </a>
             </li>

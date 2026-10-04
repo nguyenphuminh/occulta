@@ -136,8 +136,7 @@ export const CloseIcon = () => (
 
 export const ThemeIcon = () => (
   <Icon>
-    <circle cx="12" cy="12" r="8.5" />
-    <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" />
+    <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
   </Icon>
 );
 
