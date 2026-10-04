@@ -20,6 +20,7 @@
     "deploy:devnode": "node scripts/deploy.ts",
     "deploy:network": "node scripts/deploy-network.ts",
     "deploy:live": "node scripts/deploy-live.ts",
+    "verify:contracts": "node scripts/verify-contracts.ts",
     "demo": "node scripts/demo.ts",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",

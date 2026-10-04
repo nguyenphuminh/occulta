@@ -126,6 +126,23 @@ OCCULTA_DEPLOYER_KEY=0x… npm run deploy:network -- --network arbitrum-sepolia
 
 It deploys the production build (3–7 day dispute window) against the chain's real USDG and prints a `contracts` block. Add it to the network's entry in `chain.config.ts`, and list the transaction relayers and libp2p relays that serve that network.
 
+### Verify the deployed contracts
+
+Explorers verify a Stylus contract by rebuilding it with cargo-stylus and comparing the compressed code byte for byte. These contracts were deployed with the repository's own build, in `scripts/lib/stylus.ts`. It does what cargo-stylus does, but compresses with a newer brotli:
+
+- **The Poseidon hasher** compresses to the same bytes either way. It is verifiable on Arbiscan and Blockscout with cargo-stylus 0.6.3, from a copy of the contracts laid out for the explorers' build.
+- **The verifier, pool and disputes contracts** contain exactly the Wasm a cargo-stylus build gives, but it compresses differently, so explorers cannot verify them.
+
+Anyone can check all four instead:
+
+```sh
+npm run verify:contracts
+```
+
+- **What it checks:** it takes the pool's address from the network configuration and the verifier, hasher and disputes addresses from the pool's storage. It rebuilds all four contracts from this source and compares each one, byte for byte, with the code on Arbitrum Sepolia.
+- **Source paths:** the deployed code contains the source paths of the machine that built it, in its panic messages, so the rebuild maps its own paths to those.
+- **Requirements:** Rust 1.91.0, from `contracts/rust-toolchain.toml`, and wasm-tools 1.260.0. `scripts/setup-tools.sh` installs both.
+
 ### Live deployment
 
 The two live pieces:

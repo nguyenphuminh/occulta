@@ -36,13 +36,18 @@ export interface BuiltContract {
   code: Uint8Array;
 }
 
-/** `e2e` builds the Disputes contract with the short dispute window used by dev-node tests. */
-export function buildContracts({ e2e = false } = {}): BuiltContract[] {
-  const targetDir = join(CONTRACTS_DIR, 'target', e2e ? 'e2e' : 'release-wasm');
+/**
+ * `e2e` builds the Disputes contract with the short dispute window used by dev-node tests.
+ * `remapPaths` rewrites source path prefixes, which the contracts' panic messages carry, as [from, to].
+ */
+export function buildContracts({ e2e = false, remapPaths = [] as [string, string][] } = {}): BuiltContract[] {
+  const targetDir = join(CONTRACTS_DIR, 'target', e2e ? 'e2e' : remapPaths.length > 0 ? 'remapped' : 'release-wasm');
   const args = ['build', '--release', '--lib', '--target', 'wasm32-unknown-unknown', '--target-dir', targetDir];
   for (const name of CONTRACTS) args.push('-p', `occulta-${name}`);
   if (e2e) args.push('--features', 'occulta-disputes/e2e-short-window');
-  execFileSync('cargo', args, { cwd: CONTRACTS_DIR, stdio: ['ignore', 'ignore', 'inherit'] });
+  const rustflags = remapPaths.map(([from, to]) => `--remap-path-prefix=${from}=${to}`).join('\x1f');
+  const env = remapPaths.length > 0 ? { ...process.env, CARGO_ENCODED_RUSTFLAGS: rustflags } : process.env;
+  execFileSync('cargo', args, { cwd: CONTRACTS_DIR, stdio: ['ignore', 'ignore', 'inherit'], env });
 
   const work = mkdtempSync(join(tmpdir(), 'occulta-wasm-'));
   try {

@@ -33,7 +33,7 @@ fi
 
 if ! command -v wasm-tools >/dev/null; then
   echo "installing wasm-tools"
-  cargo +stable install --locked wasm-tools 2>/dev/null || { rustup toolchain install stable --profile minimal && cargo +stable install --locked wasm-tools; }
+  cargo +stable install --locked wasm-tools@1.260.0 2>/dev/null || { rustup toolchain install stable --profile minimal && cargo +stable install --locked wasm-tools@1.260.0; }
 fi
 
 if [[ ! -x "$TOOLS/nitro-rootfs/usr/local/bin/nitro" ]]; then
