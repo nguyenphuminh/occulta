@@ -8,7 +8,7 @@ Users deposit ETH or USDG into a shielded pool, then open payment channels funde
 
 | | |
 |---|---|
-| HackQuest | <https://www.hackquest.io/vi/projects/Occulta> |
+| HackQuest | <https://www.hackquest.io/projects/Occulta> |
 | Demo video | <https://youtu.be/OA2P_uJtZQY> |
 | Pitch video | <https://youtu.be/Sz2T508lfog> |
 | Website | <https://occulta.space> |
