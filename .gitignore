@@ -15,6 +15,9 @@ GEMINI.md
 # --- design references: kept local, never committed ---
 /reference/
 
+# --- pitch material: kept local, never committed ---
+/pitchdeck/
+
 # --- dependencies ---
 node_modules/
 
